@@ -33,7 +33,7 @@
 <p>
 
 <hr />
-<h3 align='center'>Installation guide</h3>
+<h3 align='center'>Installation guide for Windows</h3>
 
 <b>Step 1: Clone the repository</b>
 ```	
@@ -56,16 +56,8 @@ conda activate sddw
 ```
 
 <b>Step 5: Install requirements</b>
-
-Windows 
 ```
 pip install -r requirements.txt
-```
-
-
-Linux 
-```
-pip3 install -r requirements.txt
 ```
 
 <b>Step 6: Launch gradio based WebUI</b>
