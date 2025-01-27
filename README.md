@@ -43,22 +43,22 @@
 
 <b>Step 1: Clone the repository</b>
 ```	
-git clone https://github.com/newgenai79/diffuser_t2i_webui
+git clone https://github.com/newgenai79/sd-diffuser-webui
 ```
 
 <b>Step 2: Navigate inside the cloned repository</b>
 ```	
-cd diffuser_t2i_webui
+cd sd-diffuser-webui
 ```
 
 <b>Step 3: Create virtual environment</b>
 ```	
-conda create -n dt2i python==3.10.11 -y
+conda create -n sddw python==3.10.11 -y
 ```
 
 <b>Step 4: Activate virtual environment</b>
 ```	
-conda activate dt2i
+conda activate sddw
 ```
 
 <b>Step 5: Install requirements</b>
