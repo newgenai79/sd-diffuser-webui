@@ -17,7 +17,7 @@ Credits: <a href='https://github.com/huggingface/diffusers' target='_blank'>Hugg
 
 <h2 align='center'>Supported Text-2-Video models</h2>
 <div align='center'>
-    <a href='https://github.com/NVlabs/Sana'><img src='https://img.shields.io/badge/Sana_2K_4K-blue'></a>
+    <a href='https://github.com/Lightricks/LTX-Video'><img src='https://img.shields.io/badge/LTX_Video_0.9.1-blue'></a>
 	<a href='https://github.com/Tencent/HunyuanDiT'><img src='https://img.shields.io/badge/HunyuanDIT-red'></a>
 	<a href='https://github.com/THUDM/CogView3'><img src='https://img.shields.io/badge/CogView_3_Plus-blue'></a>
 	<a href='https://github.com/Alpha-VLLM/Lumina-T2X'><img src='https://img.shields.io/badge/Lumina-red'></a>
