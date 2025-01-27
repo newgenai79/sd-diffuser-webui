@@ -21,7 +21,7 @@
 <h2 align='center'>Supported Image-2-Video models</h2>
 <div align='center'>
     <a href='https://github.com/Lightricks/LTX-Video'><img src='https://img.shields.io/badge/LTX_Video_0.9.1-blue'></a>
-	<a href='https://github.com/Tencent/HunyuanVideo/'><img src='https://img.shields.io/badge/HunyuanVideo_BitsnBytes-red'></a>
+	<a href='https://github.com/THUDM/CogVideo'><img src='https://img.shields.io/badge/CogVideoX_v1.5_5b-red'></a>
 </div>
 
 <hr />
@@ -31,7 +31,15 @@
     <img src="https://huggingface.co/datasets/newgenai79/Windows_wheels/resolve/main/img/2.png" width="800"/>
     <img src="https://huggingface.co/datasets/newgenai79/Windows_wheels/resolve/main/img/3.png" width="800"/>
 <p>
+<hr />
 
+<p align="center">
+<h3 align='center'>To-Do List</h3>
+- [x] Text 2 image: Sana, Flex.1-alpha, HunyuanDiT, CogView3 Plus, Lumina, Kandinsky-3
+- [x] Text 2 video: LTX-Video, HunyuanVideo, CogVideoX
+- [x] Image 2 video: LTX-Video, CogVideoX v1.5 5b
+- [ ] Video 2 video: CogVideoX v1.5 5b, CogVideoX-Fun v1.1 5b-Pose
+<p>
 <hr />
 <h3 align='center'>Installation guide for Windows (Currently WIP)</h3>
 
