@@ -33,7 +33,7 @@
 <p>
 
 <hr />
-<h3 align='center'>Installation guide for Windows</h3>
+<h3 align='center'>Installation guide for Windows (Currently WIP)</h3>
 
 <b>Step 1: Clone the repository</b>
 ```	
