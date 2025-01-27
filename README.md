@@ -22,6 +22,12 @@ Credits: <a href='https://github.com/huggingface/diffusers' target='_blank'>Hugg
 	<a href='https://github.com/Tencent/HunyuanVideo/'><img src='https://img.shields.io/badge/HunyuanVideo_BitsnBytes-blue'></a>
 	<a href='https://github.com/THUDM/CogVideo'><img src='https://img.shields.io/badge/CogVideoX_v1.5_5b-red'></a>
 </div>
+
+<h2 align='center'>Supported Image-2-Video models</h2>
+<div align='center'>
+    <a href='https://github.com/Lightricks/LTX-Video'><img src='https://img.shields.io/badge/LTX_Video_0.9.1-blue'></a>
+	<a href='https://github.com/Tencent/HunyuanVideo/'><img src='https://img.shields.io/badge/HunyuanVideo_BitsnBytes-red'></a>
+</div>
 <hr />
 <p align="center">
 	<h3 align='center'>Sana 2K</h3>
