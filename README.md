@@ -25,6 +25,14 @@
 </div>
 
 <hr />
+
+<p align="center">
+    <img src="https://huggingface.co/datasets/newgenai79/Windows_wheels/resolve/main/img/1.png" width="800"/>
+    <img src="https://huggingface.co/datasets/newgenai79/Windows_wheels/resolve/main/img/2.png" width="800"/>
+    <img src="https://huggingface.co/datasets/newgenai79/Windows_wheels/resolve/main/img/3.png" width="800"/>
+<p>
+
+<hr />
 <h3 align='center'>Installation guide</h3>
 
 <b>Step 1: Clone the repository</b>
