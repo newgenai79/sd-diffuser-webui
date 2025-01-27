@@ -1,0 +1,23 @@
+--extra-index-url https://download.pytorch.org/whl/cu124
+torch==2.5.1+cu124
+torchvision==0.20.1+cu124
+torchaudio
+transformers>=4.47.1
+sentencepiece>=0.1.96
+huggingface-hub
+einops
+opencv-python
+imageio
+imageio-ffmpeg
+gradio
+git+https://github.com/huggingface/diffusers
+protobuf
+gguf
+torchao
+git+https://github.com/huggingface/accelerate
+bitsandbytes
+git+https://github.com/huggingface/optimum-quanto
+patch_conv
+https://huggingface.co/datasets/newgenai79/Windows_wheels/resolve/main/TRITON/triton-3.1.0-cp310-cp310-win_amd64.whl?download=true; platform_system == "Windows" and python_version == "3.10"
+https://huggingface.co/datasets/newgenai79/Windows_wheels/resolve/main/TRITON/triton-3.1.0-cp311-cp311-win_amd64.whl?download=true; platform_system == "Windows" and python_version == "3.11"
+https://huggingface.co/datasets/newgenai79/Windows_wheels/resolve/main/TRITON/triton-3.1.0-cp312-cp312-win_amd64.whl?download=true; platform_system == "Windows" and python_version == "3.12"
