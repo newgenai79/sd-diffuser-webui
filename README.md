@@ -23,20 +23,6 @@
     <a href='https://github.com/Lightricks/LTX-Video'><img src='https://img.shields.io/badge/LTX_Video_0.9.1-blue'></a>
 	<a href='https://github.com/Tencent/HunyuanVideo/'><img src='https://img.shields.io/badge/HunyuanVideo_BitsnBytes-red'></a>
 </div>
-<hr />
-<p align="center">
-	<h3 align='center'>Sana 2K</h3>
-    <img src="https://huggingface.co/datasets/newgenai79/Windows_wheels/resolve/main/img/Sana1.jpg" width="800"/>
-	<h3 align='center'>CogView3-Plus</h3>
-    <img src="https://huggingface.co/datasets/newgenai79/Windows_wheels/resolve/main/img/CogView3Plus1.jpg" width="800"/>
-	<h3 align='center'>HunyuanDiT</h3>
-    <img src="https://huggingface.co/datasets/newgenai79/Windows_wheels/resolve/main/img/HunyuanDiT.jpg" width="800"/>
-	<h3 align='center'>Kandinsky3</h3>
-    <img src="https://huggingface.co/datasets/newgenai79/Windows_wheels/resolve/main/img/kandinsky3.jpg" width="800"/>
-	<h3 align='center'>Lumina</h3>
-    <img src="https://huggingface.co/datasets/newgenai79/Windows_wheels/resolve/main/img/Lumina1.jpg" width="800"/>
-
-<p>
 
 <hr />
 <h3 align='center'>Installation guide</h3>
