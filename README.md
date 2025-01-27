@@ -1,10 +1,5 @@
-<h1 align='center'>Diffusers: Text to Image webui</h1>
+<h1 align='center'>WebUI for Image/Video generation</h1>
 
-<div align='center'>
-Credits: <a href='https://github.com/huggingface/diffusers' target='_blank'>Huggingface/Diffusers team</a>
-</div>
-<br />
-<hr />
 <h2 align='center'>Supported Text-2-Image models</h2>
 <div align='center'>
 	<a href='https://huggingface.co/ostris/Flex.1-alpha'><img src='https://img.shields.io/badge/Flex.1_alpha-red'></a>
@@ -95,3 +90,8 @@ python app.py
 	<li><a href="https://developer.nvidia.com/cuda-downloads" target="_blank">CUDA 12.6</a> (Cuda compilation tools, release 12.6, V12.6.77 - Build cuda_12.6.r12.6/compiler.34841621_0)</li>
 	<li><a href="https://visualstudio.microsoft.com/vs/community/" target="_blank">Microsoft (R) C/C++ Optimizing Compiler Version 19.29.30157 for x64</a></li>
 </ul>
+
+<div align='center'>
+Credits: <a href='https://github.com/huggingface/diffusers' target='_blank'>Huggingface/Diffusers team</a>
+Note: We are not affliated with Diffusers team
+</div>
