@@ -28,10 +28,8 @@
 
 <p align="center">
     <img src="https://huggingface.co/datasets/newgenai79/Windows_wheels/resolve/main/img/1.png" width="800"/>
-	
     <img src="https://huggingface.co/datasets/newgenai79/Windows_wheels/resolve/main/img/2.png" width="800"/>
-    
-	<img src="https://huggingface.co/datasets/newgenai79/Windows_wheels/resolve/main/img/3.png" width="800"/>
+    <img src="https://huggingface.co/datasets/newgenai79/Windows_wheels/resolve/main/img/3.png" width="800"/>
 <p>
 
 <hr />
