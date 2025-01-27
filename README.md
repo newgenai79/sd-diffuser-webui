@@ -79,5 +79,6 @@ python app.py
 
 <div align='center'>
 Credits: <a href='https://github.com/huggingface/diffusers' target='_blank'>Huggingface/Diffusers team</a>
+<br />
 Note: We are not affliated with Diffusers team
 </div>
