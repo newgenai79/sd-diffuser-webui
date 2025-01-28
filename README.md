@@ -39,7 +39,7 @@
 - [x] Text 2 video: LTX-Video, HunyuanVideo, CogVideoX<br />
 - [x] Image 2 video: LTX-Video, CogVideoX v1.5 5b<br />
 - [ ] Video 2 video: CogVideoX v1.5 5b, CogVideoX-Fun v1.1 5b-Pose<br />
-
+- [ ] Text 2 image: AuraFlow GGUF<br />
 <hr />
 <h3 align='center'>Installation guide for Windows (Currently WIP)</h3>
 
