@@ -2,11 +2,12 @@
 
 <h2 align='center'>Supported Text-2-Image models</h2>
 <div align='center'>
-	<a href='https://huggingface.co/ostris/Flex.1-alpha'><img src='https://img.shields.io/badge/Flex.1_alpha-blue'></a>
+	<!--a href='https://huggingface.co/ostris/Flex.1-alpha'><img src='https://img.shields.io/badge/Flex.1_alpha-blue'></a-->
+	<a href='https://huggingface.co/Alpha-VLLM/Lumina-Image-2.0'><img src='https://img.shields.io/badge/Lumina_Image_2.0-blue'></a>
     <a href='https://github.com/NVlabs/Sana'><img src='https://img.shields.io/badge/Sana_2K_4K-red'></a>
 	<a href='https://github.com/Tencent/HunyuanDiT'><img src='https://img.shields.io/badge/HunyuanDIT-blue'></a>
 	<a href='https://github.com/THUDM/CogView3'><img src='https://img.shields.io/badge/CogView_3_Plus-red'></a>
-	<a href='https://github.com/Alpha-VLLM/Lumina-T2X'><img src='https://img.shields.io/badge/Lumina-blue'></a>
+	<a href='https://huggingface.co/Alpha-VLLM/Lumina-Next-SFT-diffusers'><img src='https://img.shields.io/badge/Lumina_Next_SFT-blue'></a>
 	<a href='https://github.com/ai-forever/Kandinsky-3'><img src='https://img.shields.io/badge/Kandinsky3-red'></a>
 </div>
 
@@ -24,6 +25,12 @@
 	<a href='https://github.com/THUDM/CogVideo'><img src='https://img.shields.io/badge/CogVideoX_v1.5_5b-red'></a>
 </div>
 
+<h2 align='center'>Supported Video-2-Video models</h2>
+<div align='center'>
+    <a href='https://github.com/THUDM/CogVideo'><img src='https://img.shields.io/badge/CogVideoX-blue'></a>
+	<a href='https://huggingface.co/alibaba-pai/CogVideoX-Fun-V1.1-5b-Pose'><img src='https://img.shields.io/badge/CogVideoX_Fun_Pose-red'></a>
+</div>
+
 <hr />
 
 <p align="center">
@@ -35,11 +42,11 @@
 
 
 <h3 align='center'>To-Do List</h3>
-- [x] Text 2 image: Sana, Flex.1-alpha, HunyuanDiT, CogView3 Plus, Lumina, Kandinsky-3<br />
+- [x] Text 2 image: Sana, HunyuanDiT, CogView3 Plus, Lumina Next SFT, Lumina Image 2.0, Kandinsky-3<br />
 - [x] Text 2 video: LTX-Video, HunyuanVideo, CogVideoX<br />
 - [x] Image 2 video: LTX-Video, CogVideoX v1.5 5b<br />
 - [ ] Video 2 video: CogVideoX v1.5 5b, CogVideoX-Fun v1.1 5b-Pose<br />
-- [ ] Text 2 image: AuraFlow GGUF<br />
+- [ ] Text 2 image: AuraFlow 0.3 GGUF<br />
 <hr />
 <h3 align='center'>Installation guide for Windows (Currently WIP)</h3>
 
