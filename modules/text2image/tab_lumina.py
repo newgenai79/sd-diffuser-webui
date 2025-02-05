@@ -17,11 +17,12 @@ OUTPUT_DIR = "output/t2i/Lumina"
 def random_seed():
     return torch.randint(0, MAX_SEED, (1,)).item()
 
-def get_pipeline(memory_optimization, vaeslicing, vaetiling):
+def get_pipeline(memory_optimization, vaeslicing, vaetiling, inference_type):
     print("----Lumina mode: ",memory_optimization, vaeslicing, vaetiling)
     # If model is already loaded with same configuration, reuse it
     if (modules.util.config.global_pipe is not None and 
         type(modules.util.config.global_pipe).__name__ == "LuminaText2ImgPipeline" and
+        modules.util.config.global_inference_type == inference_type and 
         modules.util.config.global_memory_mode == memory_optimization):
         print(">>>>Reusing Lumina pipe<<<<")
         return modules.util.config.global_pipe
@@ -47,6 +48,7 @@ def get_pipeline(memory_optimization, vaeslicing, vaetiling):
         
     # Update global variables
     modules.util.config.global_memory_mode = memory_optimization
+    modules.util.config.global_inference_type = inference_type
     return modules.util.config.global_pipe
 
 def generate_images(
@@ -59,7 +61,7 @@ def generate_images(
     modules.util.config.global_inference_in_progress = True
     try:
         # Get pipeline (either cached or newly loaded)
-        pipe = get_pipeline(memory_optimization, vaeslicing, vaetiling)
+        pipe = get_pipeline(memory_optimization, vaeslicing, vaetiling, "lumina1")
         generator = torch.Generator(device="cuda").manual_seed(seed)
         
         # Prepare inference parameters
