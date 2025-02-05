@@ -8,53 +8,50 @@ import numpy as np
 import os
 import modules.util.config
 from datetime import datetime
-from diffusers.utils import export_to_video
-from diffusers import LTXPipeline
-from transformers import T5EncoderModel, T5Tokenizer
+from diffusers import LuminaText2ImgPipeline
 from modules.util.utilities import clear_previous_model_memory
 
 MAX_SEED = np.iinfo(np.int32).max
-OUTPUT_DIR = "output/t2v/ltxvideo091"
+OUTPUT_DIR = "output/t2i/Lumina"
 
 def random_seed():
     return torch.randint(0, MAX_SEED, (1,)).item()
 
-def get_pipeline(memory_optimization):
-    print("----ltxvideo091 mode: ", memory_optimization)
+def get_pipeline(memory_optimization, vaeslicing, vaetiling):
+    print("----Lumina mode: ",memory_optimization, vaeslicing, vaetiling)
     # If model is already loaded with same configuration, reuse it
     if (modules.util.config.global_pipe is not None and 
-        type(modules.util.config.global_pipe).__name__ == "LTXPipeline" and
+        type(modules.util.config.global_pipe).__name__ == "LuminaText2ImgPipeline" and
         modules.util.config.global_memory_mode == memory_optimization):
-        print(">>>>Reusing ltxvideo091 pipe<<<<")
+        print(">>>>Reusing Lumina pipe<<<<")
         return modules.util.config.global_pipe
     else:
         clear_previous_model_memory()
-    
-    repo_id = "a-r-r-o-w/LTX-Video-0.9.1-diffusers"
-    single_file_url = "https://huggingface.co/Lightricks/LTX-Video/blob/main/ltx-video-2b-v0.9.1.safetensors"
-    text_encoder = T5EncoderModel.from_pretrained(
-      repo_id, subfolder="text_encoder", torch_dtype=torch.bfloat16
-    )
-    tokenizer = T5Tokenizer.from_pretrained(
-      repo_id, subfolder="tokenizer", torch_dtype=torch.bfloat16
-    )
-    modules.util.config.global_pipe = LTXPipeline.from_single_file(
-        single_file_url, 
-        text_encoder=text_encoder, 
-        tokenizer=tokenizer, 
-        torch_dtype=torch.bfloat16
+        
+    modules.util.config.global_pipe = LuminaText2ImgPipeline.from_pretrained(
+        "Alpha-VLLM/Lumina-Image-2.0",
+        torch_dtype=torch.bfloat16,
     )
 
     if memory_optimization == "Low VRAM":
         modules.util.config.global_pipe.enable_model_cpu_offload()
 
+    if vaeslicing:
+        modules.util.config.global_pipe.vae.enable_slicing()
+    else:
+        modules.util.config.global_pipe.vae.disable_slicing()
+    if vaetiling:
+        modules.util.config.global_pipe.vae.enable_tiling()
+    else:
+        modules.util.config.global_pipe.vae.disable_tiling()
+        
+    # Update global variables
     modules.util.config.global_memory_mode = memory_optimization
-    
     return modules.util.config.global_pipe
 
-def generate_video(
-    seed, prompt, negative_prompt, width, height, fps,
-    num_inference_steps, num_frames, memory_optimization,
+def generate_images(
+    seed, prompt, negative_prompt, width, height, guidance_scale,
+    num_inference_steps, memory_optimization, vaeslicing, vaetiling, 
 ):
     if modules.util.config.global_inference_in_progress == True:
         print(">>>>Inference in progress, can't continue<<<<")
@@ -62,113 +59,119 @@ def generate_video(
     modules.util.config.global_inference_in_progress = True
     try:
         # Get pipeline (either cached or newly loaded)
-        pipe = get_pipeline(memory_optimization)
+        pipe = get_pipeline(memory_optimization, vaeslicing, vaetiling)
         generator = torch.Generator(device="cuda").manual_seed(seed)
-        progress_bar = gr.Progress(track_tqdm=True)
-
-        def callback_on_step_end(pipe, i, t, callback_kwargs):
-            progress_bar(i / num_inference_steps, desc=f"Generating video (Step {i}/{num_inference_steps})")
-            return callback_kwargs
+        
         # Prepare inference parameters
         inference_params = {
             "prompt": prompt,
             "negative_prompt": negative_prompt,
             "height": height,
             "width": width,
+            "guidance_scale": guidance_scale,
             "num_inference_steps": num_inference_steps,
-            "num_frames": num_frames,
+            "cfg_trunc_ratio": 0.25,
+            "cfg_normalization": True,
             "generator": generator,
-            "callback_on_step_end": callback_on_step_end,
         }
 
-        # Generate video
-        video = pipe(**inference_params).frames[0]
+        # Generate images
+        image = pipe(**inference_params).images[0]
         
         # Create output directory if it doesn't exist
         os.makedirs(OUTPUT_DIR, exist_ok=True)
         
-        base_filename = "ltxvideo091.mp4"
+        base_filename = "lumina2.png"
         
         gallery_items = []
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
         filename = f"{timestamp}_{base_filename}"
         output_path = os.path.join(OUTPUT_DIR, filename)
         
-        # Save the video
-        export_to_video(video, output_path, fps=fps)
-        print(f"Video generated: {output_path}")
+        # Save the image
+        image.save(output_path)
+        print(f"Image generated: {output_path}")
         modules.util.config.global_inference_in_progress = False
+        # Add to gallery items
+        gallery_items.append((output_path, "Lumina"))
         
-        return output_path
+        return gallery_items
     except Exception as e:
         print(f"Error during inference: {str(e)}")
         return None
     finally:
         modules.util.config.global_inference_in_progress = False
 
-def create_ltxvideo091_tab():
-    with gr.Row():
-        ltxvideo091_memory_optimization = gr.Radio(
-            choices=["No optimization", "Low VRAM"],
-            label="Memory Optimization",
-            value="Low VRAM",
-            interactive=True
-        )
+def create_lumina2_tab():
     with gr.Row():
         with gr.Column():
-            ltxvideo091_prompt_input = gr.Textbox(
+            lumina_memory_optimization = gr.Radio(
+                choices=["No optimization", "Low VRAM"],
+                label="Memory Optimization",
+                value="Low VRAM",
+                interactive=True
+            )
+        with gr.Column():
+            lumina_vaeslicing = gr.Checkbox(label="VAE slicing", value=True, interactive=True)
+            lumina_vaetiling = gr.Checkbox(label="VAE Tiling", value=True, interactive=True)
+    with gr.Row():
+        with gr.Column():
+            lumina_prompt_input = gr.Textbox(
                 label="Prompt", 
                 lines=3,
                 interactive=True
             )
-            ltxvideo091_negative_prompt_input = gr.Textbox(
+            lumina_negative_prompt_input = gr.Textbox(
                 label="Negative Prompt",
                 lines=3,
                 interactive=True
             )
         with gr.Column():
             with gr.Row():
-                ltxvideo091_width_input = gr.Number(
+                lumina_width_input = gr.Number(
                     label="Width", 
-                    value=704, 
+                    value=1024, 
                     interactive=True
                 )
-                ltxvideo091_height_input = gr.Number(
+                lumina_height_input = gr.Number(
                     label="Height", 
-                    value=480, 
+                    value=1024, 
                     interactive=True
                 )
                 seed_input = gr.Number(label="Seed", value=0, minimum=0, maximum=MAX_SEED, interactive=True)
                 random_button = gr.Button("Randomize Seed")
             with gr.Row():
-                ltxvideo091_fps_input = gr.Number(
-                    label="FPS", 
-                    value=24,
+                lumina_guidance_scale_slider = gr.Slider(
+                    label="Guidance Scale", 
+                    minimum=1.0, 
+                    maximum=20.0, 
+                    value=4.0, 
+                    step=0.1,
                     interactive=True
                 )
-                ltxvideo091_num_inference_steps_input = gr.Number(
+                lumina_num_inference_steps_input = gr.Number(
                     label="Number of Inference Steps", 
                     value=50,
                     interactive=True
                 )
-                ltxvideo091_num_frames_input = gr.Number(
-                    label="Number of frames", 
-                    value=61,
-                    interactive=True
-                )
     with gr.Row():
-        generate_button = gr.Button("Generate video")
-    output_video = gr.Video(label="Generated Video", show_label=True)
+        generate_button = gr.Button("Generate image")
+    output_gallery = gr.Gallery(
+        label="Generated Image(s)",
+        columns=3,
+        rows=None,
+        height="auto"
+    )
 
     # Event handlers
     random_button.click(fn=random_seed, outputs=[seed_input])
 
     generate_button.click(
-        fn=generate_video,
+        fn=generate_images,
         inputs=[
-            seed_input, ltxvideo091_prompt_input, ltxvideo091_negative_prompt_input, ltxvideo091_width_input, 
-            ltxvideo091_height_input, ltxvideo091_fps_input, ltxvideo091_num_inference_steps_input, 
-            ltxvideo091_num_frames_input, ltxvideo091_memory_optimization,
+            seed_input, lumina_prompt_input, lumina_negative_prompt_input, lumina_width_input, 
+            lumina_height_input, lumina_guidance_scale_slider, lumina_num_inference_steps_input, 
+            lumina_memory_optimization, lumina_vaeslicing, lumina_vaetiling,
         ],
-        outputs=[output_video]
+        outputs=[output_gallery]
     )

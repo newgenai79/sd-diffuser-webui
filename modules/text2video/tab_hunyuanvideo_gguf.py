@@ -73,7 +73,7 @@ def get_pipeline(memory_optimization, gguf_file, vaeslicing, vaetiling):
         modules.util.config.global_pipe.vae.disable_tiling()
 
     modules.util.config.global_memory_mode = memory_optimization
-    
+    modules.util.config.global_selected_gguf = gguf_file
     return modules.util.config.global_pipe
 
 def generate_video(
@@ -84,45 +84,51 @@ def generate_video(
         print(">>>>Inference in progress, can't continue<<<<")
         return None
     modules.util.config.global_inference_in_progress = True
-    gguf_file, gguf_file_size = get_gguf(gguf_file)
-    # Get pipeline (either cached or newly loaded)
-    pipe = get_pipeline(memory_optimization, gguf_file, vaeslicing, vaetiling)
-    generator = torch.Generator(device="cuda").manual_seed(seed)
-    progress_bar = gr.Progress(track_tqdm=True)
+    try:
+        gguf_file, gguf_file_size = get_gguf(gguf_file)
+        # Get pipeline (either cached or newly loaded)
+        pipe = get_pipeline(memory_optimization, gguf_file, vaeslicing, vaetiling)
+        generator = torch.Generator(device="cuda").manual_seed(seed)
+        progress_bar = gr.Progress(track_tqdm=True)
 
-    def callback_on_step_end(pipe, i, t, callback_kwargs):
-        progress_bar(i / num_inference_steps, desc=f"Generating video (Step {i}/{num_inference_steps})")
-        return callback_kwargs
-    # Prepare inference parameters
-    inference_params = {
-        "prompt": prompt,
-        "height": height,
-        "width": width,
-        "num_inference_steps": num_inference_steps,
-        "num_frames": num_frames,
-        "generator": generator,
-        "callback_on_step_end": callback_on_step_end,
-    }
+        def callback_on_step_end(pipe, i, t, callback_kwargs):
+            progress_bar(i / num_inference_steps, desc=f"Generating video (Step {i}/{num_inference_steps})")
+            return callback_kwargs
+        # Prepare inference parameters
+        inference_params = {
+            "prompt": prompt,
+            "height": height,
+            "width": width,
+            "num_inference_steps": num_inference_steps,
+            "num_frames": num_frames,
+            "generator": generator,
+            "callback_on_step_end": callback_on_step_end,
+        }
 
-    # Generate video
-    video = pipe(**inference_params).frames[0]
-    
-    # Create output directory if it doesn't exist
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
-    
-    base_filename = "hunyuanvideo_gguf.mp4"
-    
-    gallery_items = []
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-    filename = f"{timestamp}_{base_filename}"
-    output_path = os.path.join(OUTPUT_DIR, filename)
-    
-    # Save the video
-    export_to_video(video, output_path, fps=fps)
-    print(f"Video generated: {output_path}")
-    modules.util.config.global_inference_in_progress = False
-    
-    return output_path
+        # Generate video
+        video = pipe(**inference_params).frames[0]
+        
+        # Create output directory if it doesn't exist
+        os.makedirs(OUTPUT_DIR, exist_ok=True)
+        
+        base_filename = "hunyuanvideo_gguf.mp4"
+        
+        gallery_items = []
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        filename = f"{timestamp}_{base_filename}"
+        output_path = os.path.join(OUTPUT_DIR, filename)
+        
+        # Save the video
+        export_to_video(video, output_path, fps=fps)
+        print(f"Video generated: {output_path}")
+        modules.util.config.global_inference_in_progress = False
+        
+        return output_path
+    except Exception as e:
+        print(f"Error during inference: {str(e)}")
+        return None
+    finally:
+        modules.util.config.global_inference_in_progress = False
 
 def create_hunyuanvideo_gguf_tab():
     with gr.Row():

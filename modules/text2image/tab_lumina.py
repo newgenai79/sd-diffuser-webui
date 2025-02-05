@@ -57,42 +57,48 @@ def generate_images(
         print(">>>>Inference in progress, can't continue<<<<")
         return None
     modules.util.config.global_inference_in_progress = True
-    # Get pipeline (either cached or newly loaded)
-    pipe = get_pipeline(memory_optimization, vaeslicing, vaetiling)
-    generator = torch.Generator(device="cuda").manual_seed(seed)
-    
-    # Prepare inference parameters
-    inference_params = {
-        "prompt": prompt,
-        "negative_prompt": negative_prompt,
-        "height": height,
-        "width": width,
-        "guidance_scale": guidance_scale,
-        "num_inference_steps": num_inference_steps,
-        "generator": generator,
-    }
+    try:
+        # Get pipeline (either cached or newly loaded)
+        pipe = get_pipeline(memory_optimization, vaeslicing, vaetiling)
+        generator = torch.Generator(device="cuda").manual_seed(seed)
+        
+        # Prepare inference parameters
+        inference_params = {
+            "prompt": prompt,
+            "negative_prompt": negative_prompt,
+            "height": height,
+            "width": width,
+            "guidance_scale": guidance_scale,
+            "num_inference_steps": num_inference_steps,
+            "generator": generator,
+        }
 
-    # Generate images
-    image = pipe(**inference_params).images[0]
-    
-    # Create output directory if it doesn't exist
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
-    
-    base_filename = "lumina.png"
-    
-    gallery_items = []
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-    filename = f"{timestamp}_{base_filename}"
-    output_path = os.path.join(OUTPUT_DIR, filename)
-    
-    # Save the image
-    image.save(output_path)
-    print(f"Image generated: {output_path}")
-    modules.util.config.global_inference_in_progress = False
-    # Add to gallery items
-    gallery_items.append((output_path, "Lumina"))
-    
-    return gallery_items
+        # Generate images
+        image = pipe(**inference_params).images[0]
+        
+        # Create output directory if it doesn't exist
+        os.makedirs(OUTPUT_DIR, exist_ok=True)
+        
+        base_filename = "lumina.png"
+        
+        gallery_items = []
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        filename = f"{timestamp}_{base_filename}"
+        output_path = os.path.join(OUTPUT_DIR, filename)
+        
+        # Save the image
+        image.save(output_path)
+        print(f"Image generated: {output_path}")
+        modules.util.config.global_inference_in_progress = False
+        # Add to gallery items
+        gallery_items.append((output_path, "Lumina"))
+        
+        return gallery_items
+    except Exception as e:
+        print(f"Error during inference: {str(e)}")
+        return None
+    finally:
+        modules.util.config.global_inference_in_progress = False
 
 def create_lumina_tab():
     with gr.Row():

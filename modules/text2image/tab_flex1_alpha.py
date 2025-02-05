@@ -54,7 +54,7 @@ def get_pipeline(memory_optimization, quantization, vaeslicing, vaetiling):
     if memory_optimization == "Low VRAM":
         modules.util.config.global_pipe.enable_model_cpu_offload()
     elif memory_optimization == "Extremely Low VRAM":
-        modules.util.config.global_pipe.enable_model_cpu_offload()
+        modules.util.config.global_pipe.enable_sequential_cpu_offload()
 
     if vaeslicing:
         modules.util.config.global_pipe.vae.enable_slicing()
@@ -79,50 +79,56 @@ def generate_images(
         print(">>>>Inference in progress, can't continue<<<<")
         return None
     modules.util.config.global_inference_in_progress = True
-    # Get pipeline (either cached or newly loaded)
-    pipe = get_pipeline(memory_optimization, quantization, vaeslicing, vaetiling)
-    generator = torch.Generator(device="cuda").manual_seed(seed)
+    try:
+        # Get pipeline (either cached or newly loaded)
+        pipe = get_pipeline(memory_optimization, quantization, vaeslicing, vaetiling)
+        generator = torch.Generator(device="cuda").manual_seed(seed)
 
-    progress_bar = gr.Progress(track_tqdm=True)
+        progress_bar = gr.Progress(track_tqdm=True)
 
-    def callback_on_step_end(pipe, i, t, callback_kwargs):
-        progress_bar(i / num_inference_steps, desc=f"Generating image (Step {i}/{num_inference_steps})")
-        return callback_kwargs
+        def callback_on_step_end(pipe, i, t, callback_kwargs):
+            progress_bar(i / num_inference_steps, desc=f"Generating image (Step {i}/{num_inference_steps})")
+            return callback_kwargs
 
-    # Prepare inference parameters
-    inference_params = {
-        "prompt": prompt,
-        "negative_prompt": negative_prompt,
-        "height": height,
-        "width": width,
-        "guidance_scale": guidance_scale,
-        "num_inference_steps": num_inference_steps,
-        "generator": generator,
-        "max_sequence_length":512,
-        "callback_on_step_end": callback_on_step_end,
-    }
+        # Prepare inference parameters
+        inference_params = {
+            "prompt": prompt,
+            "negative_prompt": negative_prompt,
+            "height": height,
+            "width": width,
+            "guidance_scale": guidance_scale,
+            "num_inference_steps": num_inference_steps,
+            "generator": generator,
+            "max_sequence_length":512,
+            "callback_on_step_end": callback_on_step_end,
+        }
 
-    # Generate images
-    image = pipe(**inference_params).images[0]
-    
-    # Create output directory if it doesn't exist
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
-    
-    base_filename = "flex1_alpha.png"
-    
-    gallery_items = []
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-    filename = f"{timestamp}_{base_filename}"
-    output_path = os.path.join(OUTPUT_DIR, filename)
-    
-    # Save the image
-    image.save(output_path)
-    print(f"Image generated: {output_path}")
-    modules.util.config.global_inference_in_progress = False
-    # Add to gallery items
-    gallery_items.append((output_path, "Flex.1-alpha"))
-    
-    return gallery_items
+        # Generate images
+        image = pipe(**inference_params).images[0]
+        
+        # Create output directory if it doesn't exist
+        os.makedirs(OUTPUT_DIR, exist_ok=True)
+        
+        base_filename = "flex1_alpha.png"
+        
+        gallery_items = []
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        filename = f"{timestamp}_{base_filename}"
+        output_path = os.path.join(OUTPUT_DIR, filename)
+        
+        # Save the image
+        image.save(output_path)
+        print(f"Image generated: {output_path}")
+        modules.util.config.global_inference_in_progress = False
+        # Add to gallery items
+        gallery_items.append((output_path, "Flex.1-alpha"))
+        
+        return gallery_items
+    except Exception as e:
+        print(f"Error during inference: {str(e)}")
+        return None
+    finally:
+        modules.util.config.global_inference_in_progress = False
 
 def create_flex1_alpha_tab():
     with gr.Row():
@@ -130,7 +136,7 @@ def create_flex1_alpha_tab():
             flex1_alpha_quantization = gr.Radio(
                 choices=["No quantization", "int8wo"],
                 label="TorchAO quantization",
-                value="No quantization",
+                value="int8wo",
                 interactive=True
             )
         with gr.Column(scale=2):
@@ -174,7 +180,7 @@ def create_flex1_alpha_tab():
                     label="Guidance Scale", 
                     minimum=1.0, 
                     maximum=20.0, 
-                    value=7.5, 
+                    value=1.0, 
                     step=0.1,
                     interactive=True
                 )

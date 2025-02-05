@@ -77,58 +77,64 @@ def generate_images(
         print(">>>>Inference in progress, can't continue<<<<")
         return None
     modules.util.config.global_inference_in_progress = True
-    # Get pipeline (either cached or newly loaded)
-    pipe = get_pipeline(inference_type, memory_optimization, vaeslicing, vaetiling)
-    generator = torch.Generator(device="cuda").manual_seed(seed)
-    
-    progress_bar = gr.Progress(track_tqdm=True)
-
-    def callback_on_step_end(pipe, i, t, callback_kwargs):
-        progress_bar(i / num_inference_steps, desc=f"Generating image (Step {i}/{num_inference_steps})")
-        return callback_kwargs
-
-    # Prepare inference parameters
-    inference_params = {
-        "prompt": prompt,
-        "negative_prompt": negative_prompt,
-        "height": height,
-        "width": width,
-        "guidance_scale": guidance_scale,
-        "num_inference_steps": num_inference_steps,
-        "generator": generator,
-        "num_images_per_prompt": num_images_per_prompt,
-        "callback_on_step_end": callback_on_step_end,
-    }
-    
-    
-    # Generate images
-    images = pipe(**inference_params).images
-    
-    # Create output directory if it doesn't exist
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
-    
-    # Get base filename based on inference type
-    if inference_type == "Sana 2K":
-        base_filename = "sana_2K.png"
-    elif inference_type == "Sana 4K":
-        base_filename = "sana_4K.png"
-    
-    # Save each image with unique timestamp and collect paths for gallery
-    gallery_items = []
-    for idx, image in enumerate(images):
-        # Generate unique timestamp for each image
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-        filename = f"{timestamp}_{idx+1}_{base_filename}"
-        output_path = os.path.join(OUTPUT_DIR, filename)
+    try:
+        # Get pipeline (either cached or newly loaded)
+        pipe = get_pipeline(inference_type, memory_optimization, vaeslicing, vaetiling)
+        generator = torch.Generator(device="cuda").manual_seed(seed)
         
-        # Save the image
-        image.save(output_path)
-        print(f"Image {idx+1} generated: {output_path}")
+        progress_bar = gr.Progress(track_tqdm=True)
+
+        def callback_on_step_end(pipe, i, t, callback_kwargs):
+            progress_bar(i / num_inference_steps, desc=f"Generating image (Step {i}/{num_inference_steps})")
+            return callback_kwargs
+
+        # Prepare inference parameters
+        inference_params = {
+            "prompt": prompt,
+            "negative_prompt": negative_prompt,
+            "height": height,
+            "width": width,
+            "guidance_scale": guidance_scale,
+            "num_inference_steps": num_inference_steps,
+            "generator": generator,
+            "num_images_per_prompt": num_images_per_prompt,
+            "callback_on_step_end": callback_on_step_end,
+        }
         
-        # Add to gallery items
-        gallery_items.append((output_path, f"{inference_type}"))
-    modules.util.config.global_inference_in_progress = False
-    return gallery_items
+        
+        # Generate images
+        images = pipe(**inference_params).images
+        
+        # Create output directory if it doesn't exist
+        os.makedirs(OUTPUT_DIR, exist_ok=True)
+        
+        # Get base filename based on inference type
+        if inference_type == "Sana 2K":
+            base_filename = "sana_2K.png"
+        elif inference_type == "Sana 4K":
+            base_filename = "sana_4K.png"
+        
+        # Save each image with unique timestamp and collect paths for gallery
+        gallery_items = []
+        for idx, image in enumerate(images):
+            # Generate unique timestamp for each image
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+            filename = f"{timestamp}_{idx+1}_{base_filename}"
+            output_path = os.path.join(OUTPUT_DIR, filename)
+            
+            # Save the image
+            image.save(output_path)
+            print(f"Image {idx+1} generated: {output_path}")
+            
+            # Add to gallery items
+            gallery_items.append((output_path, f"{inference_type}"))
+        modules.util.config.global_inference_in_progress = False
+        return gallery_items
+    except Exception as e:
+        print(f"Error during inference: {str(e)}")
+        return None
+    finally:
+        modules.util.config.global_inference_in_progress = False
 
 def create_sana_tab():
     with gr.Row():

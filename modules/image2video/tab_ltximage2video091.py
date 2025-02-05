@@ -60,46 +60,52 @@ def generate_video(
         print(">>>>Inference in progress, can't continue<<<<")
         return None
     modules.util.config.global_inference_in_progress = True
-    # Get pipeline (either cached or newly loaded)
-    pipe = get_pipeline(memory_optimization)
-    generator = torch.Generator(device="cuda").manual_seed(seed)
-    progress_bar = gr.Progress(track_tqdm=True)
+    try:
+        # Get pipeline (either cached or newly loaded)
+        pipe = get_pipeline(memory_optimization)
+        generator = torch.Generator(device="cuda").manual_seed(seed)
+        progress_bar = gr.Progress(track_tqdm=True)
 
-    def callback_on_step_end(pipe, i, t, callback_kwargs):
-        progress_bar(i / num_inference_steps, desc=f"Generating image (Step {i}/{num_inference_steps})")
-        return callback_kwargs
-    # Prepare inference parameters
-    inference_params = {
-        "image": input_image,
-        "prompt": prompt,
-        "negative_prompt": negative_prompt,
-        "height": height,
-        "width": width,
-        "num_inference_steps": num_inference_steps,
-        "num_frames": num_frames,
-        "generator": generator,
-        "callback_on_step_end": callback_on_step_end,
-    }
+        def callback_on_step_end(pipe, i, t, callback_kwargs):
+            progress_bar(i / num_inference_steps, desc=f"Generating image (Step {i}/{num_inference_steps})")
+            return callback_kwargs
+        # Prepare inference parameters
+        inference_params = {
+            "image": input_image,
+            "prompt": prompt,
+            "negative_prompt": negative_prompt,
+            "height": height,
+            "width": width,
+            "num_inference_steps": num_inference_steps,
+            "num_frames": num_frames,
+            "generator": generator,
+            "callback_on_step_end": callback_on_step_end,
+        }
 
-    # Generate video
-    video = pipe(**inference_params).frames[0]
-    
-    # Create output directory if it doesn't exist
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
-    
-    base_filename = "ltxvideo091.mp4"
-    
-    gallery_items = []
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-    filename = f"{timestamp}_{base_filename}"
-    output_path = os.path.join(OUTPUT_DIR, filename)
-    
-    # Save the video
-    export_to_video(video, output_path, fps=fps)
-    print(f"Video generated: {output_path}")
-    modules.util.config.global_inference_in_progress = False
-    
-    return output_path
+        # Generate video
+        video = pipe(**inference_params).frames[0]
+        
+        # Create output directory if it doesn't exist
+        os.makedirs(OUTPUT_DIR, exist_ok=True)
+        
+        base_filename = "ltxvideo091.mp4"
+        
+        gallery_items = []
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        filename = f"{timestamp}_{base_filename}"
+        output_path = os.path.join(OUTPUT_DIR, filename)
+        
+        # Save the video
+        export_to_video(video, output_path, fps=fps)
+        print(f"Video generated: {output_path}")
+        modules.util.config.global_inference_in_progress = False
+        
+        return output_path
+    except Exception as e:
+        print(f"Error during inference: {str(e)}")
+        return None
+    finally:
+        modules.util.config.global_inference_in_progress = False
 
 def create_ltximage2video091_tab():
     with gr.Row():

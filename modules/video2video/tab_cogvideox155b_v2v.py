@@ -8,48 +8,36 @@ import numpy as np
 import os
 import modules.util.config
 from datetime import datetime
-from diffusers.utils import export_to_video
-from diffusers import HunyuanVideoPipeline, HunyuanVideoTransformer3DModel
-from diffusers import BitsAndBytesConfig
+from diffusers.utils import export_to_video, load_video
+from diffusers import CogVideoXDPMScheduler, CogVideoXVideoToVideoPipeline
 from modules.util.utilities import clear_previous_model_memory
 
 MAX_SEED = np.iinfo(np.int32).max
-OUTPUT_DIR = "output/t2v/hunyuanvideo"
+OUTPUT_DIR = "output/v2v/cogvideox155b"
 
 def random_seed():
     return torch.randint(0, MAX_SEED, (1,)).item()
 
-def get_pipeline(memory_optimization, quantization, vaeslicing, vaetiling):
-    print("----hunyuanvideo mode: ", memory_optimization, quantization, vaeslicing, vaetiling)
+def get_pipeline(memory_optimization, vaeslicing, vaetiling):
+    print("----CogVideoXVideoToVideoPipeline mode: ", memory_optimization, vaeslicing, vaetiling)
     # If model is already loaded with same configuration, reuse it
     if (modules.util.config.global_pipe is not None and 
-        type(modules.util.config.global_pipe).__name__ == "HunyuanVideoPipeline" and
-        modules.util.config.global_quantization == quantization and
+        type(modules.util.config.global_pipe).__name__ == "CogVideoXVideoToVideoPipeline" and
         modules.util.config.global_memory_mode == memory_optimization):
-        print(">>>>Reusing hunyuanvideo pipe<<<<")
+        print(">>>>Reusing CogVideoXVideoToVideoPipeline pipe<<<<")
         return modules.util.config.global_pipe
     else:
         clear_previous_model_memory()
-    repo_id = "hunyuanvideo-community/HunyuanVideo"
-    if (quantization == "int4"):
-        quant_config = BitsAndBytesConfig(
-            load_in_4bit=True, bnb_4bit_quant_type="nf4", bnb_4bit_compute_dtype=torch.bfloat16
-        )
-    elif(quantization == "int8"):
-        quant_config = BitsAndBytesConfig(load_in_8bit=True)
-    transformer_quant = HunyuanVideoTransformer3DModel.from_pretrained(
-        repo_id,
-        subfolder="transformer",
-        quantization_config=quant_config,
-        torch_dtype=torch.bfloat16,
+    
+    modules.util.config.global_pipe = CogVideoXVideoToVideoPipeline.from_pretrained(
+        "THUDM/CogVideoX-5b",
+        torch_dtype=torch.bfloat16
     )
-    modules.util.config.global_pipe = HunyuanVideoPipeline.from_pretrained(
-        repo_id, 
-        transformer=transformer_quant,
-        torch_dtype=torch.float16
-    )
+    modules.util.config.global_pipe.scheduler = CogVideoXDPMScheduler.from_config(modules.util.config.global_pipe.scheduler.config)
     if memory_optimization == "Low VRAM":
         modules.util.config.global_pipe.enable_model_cpu_offload()
+    elif memory_optimization == "Extremely Low VRAM":
+        modules.util.config.global_pipe.enable_sequential_cpu_offload()
 
     if vaeslicing:
         modules.util.config.global_pipe.vae.enable_slicing()
@@ -61,12 +49,20 @@ def get_pipeline(memory_optimization, quantization, vaeslicing, vaetiling):
         modules.util.config.global_pipe.vae.disable_tiling()
 
     modules.util.config.global_memory_mode = memory_optimization
-    modules.util.config.global_quantization = quantization
+    
     return modules.util.config.global_pipe
+def process_video_input(video_path):
+    """Convert video input to the format expected by the pipeline"""
+    try:
+        # Use diffusers' load_video function to properly load the video
+        video_frames = load_video(video_path)
+        return video_frames
+    except Exception as e:
+        raise ValueError(f"Error processing video: {str(e)}")
 
 def generate_video(
-    seed, prompt, width, height, fps,
-    num_inference_steps, num_frames, memory_optimization, vaeslicing, vaetiling, quantization
+    input_video, guidance_scale, seed, prompt, negative_prompt, width, height, fps,
+    num_inference_steps, use_dynamic_cfg, strength, memory_optimization, vaeslicing, vaetiling
 ):
     if modules.util.config.global_inference_in_progress == True:
         print(">>>>Inference in progress, can't continue<<<<")
@@ -74,21 +70,26 @@ def generate_video(
     modules.util.config.global_inference_in_progress = True
     try:
         # Get pipeline (either cached or newly loaded)
-        pipe = get_pipeline(memory_optimization, quantization, vaeslicing, vaetiling)
+        pipe = get_pipeline(memory_optimization, vaeslicing, vaetiling)
         generator = torch.Generator(device="cuda").manual_seed(seed)
         progress_bar = gr.Progress(track_tqdm=True)
 
         def callback_on_step_end(pipe, i, t, callback_kwargs):
             progress_bar(i / num_inference_steps, desc=f"Generating video (Step {i}/{num_inference_steps})")
             return callback_kwargs
+        processed_video = process_video_input(input_video)
         # Prepare inference parameters
         inference_params = {
+            "video": processed_video,
             "prompt": prompt,
+            "negative_prompt": negative_prompt,
             "height": height,
             "width": width,
+            "strength": strength,
             "num_inference_steps": num_inference_steps,
-            "num_frames": num_frames,
+            "guidance_scale": guidance_scale,
             "generator": generator,
+            "use_dynamic_cfg": use_dynamic_cfg,
             "callback_on_step_end": callback_on_step_end,
         }
 
@@ -98,7 +99,7 @@ def generate_video(
         # Create output directory if it doesn't exist
         os.makedirs(OUTPUT_DIR, exist_ok=True)
         
-        base_filename = "hunyuanvideo_bnb.mp4"
+        base_filename = "cogvideox155bv2v.mp4"
         
         gallery_items = []
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
@@ -117,40 +118,39 @@ def generate_video(
     finally:
         modules.util.config.global_inference_in_progress = False
 
-def create_hunyuanvideo_bnb_tab():
+def create_cogvideox155b_v2v_tab():
     with gr.Row():
         with gr.Column():
-            hunyuanvideo_memory_optimization = gr.Radio(
-                choices=["No optimization", "Low VRAM"],
+            cogvideox155bv2v_memory_optimization = gr.Radio(
+                choices=["No optimization", "Low VRAM", "Extremely Low VRAM"],
                 label="Memory Optimization",
-                value="Low VRAM",
+                value="Extremely Low VRAM",
                 interactive=True
             )
         with gr.Column():
-            hunyuanvideo_vaeslicing = gr.Checkbox(label="VAE slicing", value=True, interactive=True)
-            hunyuanvideo_vaetiling = gr.Checkbox(label="VAE Tiling", value=True, interactive=True)
-        with gr.Column():
-            hunyuanvideo_quantization = gr.Radio(
-                choices=["int4", "int8"],
-                label="BitsnBytes quantization",
-                value="int4",
-                interactive=True
-            )
+            cogvideox155bv2v_vaeslicing = gr.Checkbox(label="VAE slicing", value=True, interactive=True)
+            cogvideox155bv2v_vaetiling = gr.Checkbox(label="VAE Tiling", value=True, interactive=True)
     with gr.Row():
         with gr.Column():
-            hunyuanvideo_prompt_input = gr.Textbox(
+            cogvideox155bv2v_input_video = gr.Video(label="Input Video")
+            cogvideox155bv2v_prompt_input = gr.Textbox(
                 label="Prompt", 
+                lines=5,
+                interactive=True
+            )
+            cogvideox155bv2v_negative_prompt_input = gr.Textbox(
+                label="Negative Prompt",
                 lines=3,
                 interactive=True
             )
         with gr.Column():
             with gr.Row():
-                hunyuanvideo_width_input = gr.Number(
+                cogvideox155bv2v_width_input = gr.Number(
                     label="Width", 
                     value=512, 
                     interactive=True
                 )
-                hunyuanvideo_height_input = gr.Number(
+                cogvideox155bv2v_height_input = gr.Number(
                     label="Height", 
                     value=320, 
                     interactive=True
@@ -158,21 +158,19 @@ def create_hunyuanvideo_bnb_tab():
                 seed_input = gr.Number(label="Seed", value=0, minimum=0, maximum=MAX_SEED, interactive=True)
                 random_button = gr.Button("Randomize Seed")
             with gr.Row():
-                hunyuanvideo_fps_input = gr.Number(
+                cogvideox155bv2v_fps_input = gr.Number(
                     label="FPS", 
-                    value=24,
+                    value=15,
                     interactive=True
                 )
-                hunyuanvideo_num_inference_steps_input = gr.Number(
+                cogvideox155bv2v_num_inference_steps_input = gr.Number(
                     label="Number of Inference Steps", 
                     value=50,
                     interactive=True
                 )
-                hunyuanvideo_num_frames_input = gr.Number(
-                    label="Number of frames", 
-                    value=61,
-                    interactive=True
-                )
+                cogvideox155bv2v_use_dynamic_cfg = gr.Checkbox(label="Use Dynamic CFG", value=True)
+                cogvideox155bv2v_guidance_scale = gr.Slider(label="Guidance Scale", minimum=1, maximum=20, step=0.1, value=6)
+                cogvideox155bv2v_strength = gr.Slider(label="Strength", minimum=0, maximum=1, step=0.1, value=0.8)
     with gr.Row():
         generate_button = gr.Button("Generate video")
     output_video = gr.Video(label="Generated Video", show_label=True)
@@ -183,10 +181,12 @@ def create_hunyuanvideo_bnb_tab():
     generate_button.click(
         fn=generate_video,
         inputs=[
-            seed_input, hunyuanvideo_prompt_input, hunyuanvideo_width_input, 
-            hunyuanvideo_height_input, hunyuanvideo_fps_input, hunyuanvideo_num_inference_steps_input, 
-            hunyuanvideo_num_frames_input, hunyuanvideo_memory_optimization, hunyuanvideo_vaeslicing,
-            hunyuanvideo_vaetiling, hunyuanvideo_quantization
+            cogvideox155bv2v_input_video, cogvideox155bv2v_guidance_scale,
+            seed_input, cogvideox155bv2v_prompt_input, cogvideox155bv2v_negative_prompt_input, 
+            cogvideox155bv2v_width_input, cogvideox155bv2v_height_input, cogvideox155bv2v_fps_input, 
+            cogvideox155bv2v_num_inference_steps_input,  
+            cogvideox155bv2v_use_dynamic_cfg, cogvideox155bv2v_strength, cogvideox155bv2v_memory_optimization, 
+            cogvideox155bv2v_vaeslicing, cogvideox155bv2v_vaetiling
         ],
         outputs=[output_video]
     )
