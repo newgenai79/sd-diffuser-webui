@@ -6,7 +6,7 @@ import torch
 import gradio as gr
 import numpy as np
 import os
-import modules.util.config
+import modules.util.appstate
 from datetime import datetime
 from diffusers import SanaPipeline
 from modules.util.utilities import clear_previous_model_memory
@@ -19,12 +19,12 @@ def random_seed():
 
 def get_pipeline(inference_type, memory_optimization, vaeslicing, vaetiling):
     print("----Sana mode: ",inference_type, memory_optimization, vaeslicing, vaetiling)
-    if (modules.util.config.global_pipe is not None and 
-        type(modules.util.config.global_pipe).__name__ == "SanaPipeline" and
-        modules.util.config.global_inference_type == inference_type and 
-        modules.util.config.global_memory_mode == memory_optimization):
+    if (modules.util.appstate.global_pipe is not None and 
+        type(modules.util.appstate.global_pipe).__name__ == "SanaPipeline" and
+        modules.util.appstate.global_inference_type == inference_type and 
+        modules.util.appstate.global_memory_mode == memory_optimization):
         print(">>>>Reusing Sana pipe<<<<")
-        return modules.util.config.global_pipe
+        return modules.util.appstate.global_pipe
     else:
         clear_previous_model_memory()
     
@@ -35,37 +35,37 @@ def get_pipeline(inference_type, memory_optimization, vaeslicing, vaetiling):
         model_path = "Efficient-Large-Model/Sana_1600M_2Kpx_BF16_diffusers"
 
     # Initialize pipeline
-    modules.util.config.global_pipe = SanaPipeline.from_pretrained(
+    modules.util.appstate.global_pipe = SanaPipeline.from_pretrained(
         pretrained_model_name_or_path=model_path,
         variant="bf16",
         torch_dtype=torch.bfloat16,
         use_safetensors=True,
     )
-    modules.util.config.global_pipe.to("cuda")
-    modules.util.config.global_pipe.vae.to(torch.bfloat16)
-    modules.util.config.global_pipe.text_encoder.to(torch.bfloat16)
+    modules.util.appstate.global_pipe.to("cuda")
+    modules.util.appstate.global_pipe.vae.to(torch.bfloat16)
+    modules.util.appstate.global_pipe.text_encoder.to(torch.bfloat16)
     
     if memory_optimization == "Low VRAM":
-        modules.util.config.global_pipe.enable_model_cpu_offload()
+        modules.util.appstate.global_pipe.enable_model_cpu_offload()
     if vaeslicing:
-        modules.util.config.global_pipe.enable_vae_slicing()
+        modules.util.appstate.global_pipe.enable_vae_slicing()
     else:
-        modules.util.config.global_pipe.disable_vae_slicing()
+        modules.util.appstate.global_pipe.disable_vae_slicing()
     if vaetiling:
         if inference_type == "Sana 4K":
-            modules.util.config.global_pipe.vae.enable_tiling(tile_sample_min_height=1024, tile_sample_min_width=1024, tile_sample_stride_height=896, tile_sample_stride_width=896,)
+            modules.util.appstate.global_pipe.vae.enable_tiling(tile_sample_min_height=1024, tile_sample_min_width=1024, tile_sample_stride_height=896, tile_sample_stride_width=896,)
         else:
-            modules.util.config.global_pipe.enable_vae_tiling()
+            modules.util.appstate.global_pipe.enable_vae_tiling()
     else:
-        modules.util.config.global_pipe.disable_vae_tiling()
+        modules.util.appstate.global_pipe.disable_vae_tiling()
     if inference_type == "Sana 4K":
-        if modules.util.config.global_pipe.transformer.config.sample_size == 128:
+        if modules.util.appstate.global_pipe.transformer.config.sample_size == 128:
             from patch_conv import convert_model
-            modules.util.config.global_pipe.vae = convert_model(modules.util.config.global_pipe.vae, splits=32)
+            modules.util.appstate.global_pipe.vae = convert_model(modules.util.appstate.global_pipe.vae, splits=32)
     # Update global variables
-    modules.util.config.global_memory_mode = memory_optimization
-    modules.util.config.global_inference_type = inference_type
-    return modules.util.config.global_pipe
+    modules.util.appstate.global_memory_mode = memory_optimization
+    modules.util.appstate.global_inference_type = inference_type
+    return modules.util.appstate.global_pipe
 
 def generate_images(
     seed, prompt, negative_prompt, width, height, guidance_scale,
@@ -73,10 +73,10 @@ def generate_images(
     num_images_per_prompt, vaeslicing, vaetiling, 
 ):
 
-    if modules.util.config.global_inference_in_progress == True:
+    if modules.util.appstate.global_inference_in_progress == True:
         print(">>>>Inference in progress, can't continue<<<<")
         return None
-    modules.util.config.global_inference_in_progress = True
+    modules.util.appstate.global_inference_in_progress = True
     try:
         # Get pipeline (either cached or newly loaded)
         pipe = get_pipeline(inference_type, memory_optimization, vaeslicing, vaetiling)
@@ -128,13 +128,13 @@ def generate_images(
             
             # Add to gallery items
             gallery_items.append((output_path, f"{inference_type}"))
-        modules.util.config.global_inference_in_progress = False
+        modules.util.appstate.global_inference_in_progress = False
         return gallery_items
     except Exception as e:
         print(f"Error during inference: {str(e)}")
         return None
     finally:
-        modules.util.config.global_inference_in_progress = False
+        modules.util.appstate.global_inference_in_progress = False
 
 def create_sana_tab():
     with gr.Row():

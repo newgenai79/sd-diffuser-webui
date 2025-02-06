@@ -47,8 +47,8 @@ with gr.Blocks() as dwebui:
                     create_sana_tab()
                 # with gr.Tab("Flex.1-alpha"):
                     # create_flex1_alpha_tab()
-                # with gr.Tab("Flex.1-alpha-GGUF"):
-                    # create_flex1_alpha_gguf_tab()
+                with gr.Tab("Flex.1-alpha-GGUF"):
+                    create_flex1_alpha_gguf_tab()
                 with gr.Tab("Lumina Next SFT"):
                     create_lumina_tab()
                 with gr.Tab("Lumina Image 2.0"):

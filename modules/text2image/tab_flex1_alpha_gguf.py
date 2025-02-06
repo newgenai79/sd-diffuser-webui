@@ -6,7 +6,7 @@ import torch
 import gradio as gr
 import numpy as np
 import os
-import modules.util.config
+import modules.util.appstate
 from datetime import datetime
 from diffusers import FluxPipeline, FluxTransformer2DModel
 from diffusers import GGUFQuantizationConfig
@@ -32,17 +32,18 @@ def get_gguf(gguf_user_selection):
 def random_seed():
     return torch.randint(0, MAX_SEED, (1,)).item()
 
-def get_pipeline(memory_optimization, gguf_file, vaeslicing, vaetiling):
+def get_pipeline(memory_optimization, gguf_file, vaeslicing, vaetiling, textencoder):
     model_id = "ostris/Flex.1-alpha"
     dtype = torch.bfloat16
-    print("----Flex.1-alpha-GGUF mode: ", memory_optimization, gguf_file, vaeslicing, vaetiling)
+    print("----Flex.1-alpha-GGUF mode: ", memory_optimization, gguf_file, vaeslicing, vaetiling, textencoder)
     # If model is already loaded with same configuration, reuse it
-    if (modules.util.config.global_pipe is not None and 
-        type(modules.util.config.global_pipe).__name__ == "FluxPipeline" and
-        modules.util.config.global_selected_gguf == gguf_file and
-        modules.util.config.global_memory_mode == memory_optimization):
+    if (modules.util.appstate.global_pipe is not None and 
+        type(modules.util.appstate.global_pipe).__name__ == "FluxPipeline" and
+        modules.util.appstate.global_selected_gguf == gguf_file and
+        # modules.util.appstate.global_textencoder == textencoder and 
+        modules.util.appstate.global_memory_mode == memory_optimization):
         print(">>>>Reusing Flex.1-alpha-GGUF pipe<<<<")
-        return modules.util.config.global_pipe
+        return modules.util.appstate.global_pipe
     else:
         clear_previous_model_memory()
     
@@ -51,31 +52,49 @@ def get_pipeline(memory_optimization, gguf_file, vaeslicing, vaetiling):
         transformer_path,
         quantization_config=GGUFQuantizationConfig(compute_dtype=torch.bfloat16),
         torch_dtype=dtype,
+        config=model_id,
+        subfolder="transformer"
     )
-
-    modules.util.config.global_pipe = FluxPipeline.from_pretrained(
+    """
+    if (textencoder == "T5 encoder"):
+        from transformers import T5EncoderModel
+        text_encoder_2 = T5EncoderModel.from_pretrained(
+            model_id, 
+            subfolder="text_encoder_2",
+            torch_dtype=dtype
+        )
+        modules.util.appstate.global_pipe = FluxPipeline.from_pretrained(
+            model_id,
+            transformer=transformer,
+            text_encoder_2=text_encoder_2,
+            torch_dtype=dtype,
+        )
+    else:
+    """
+    modules.util.appstate.global_pipe = FluxPipeline.from_pretrained(
         model_id,
         transformer=transformer,
         torch_dtype=dtype,
     )
     if memory_optimization == "Low VRAM":
-        modules.util.config.global_pipe.enable_model_cpu_offload()
+        modules.util.appstate.global_pipe.enable_model_cpu_offload()
     elif memory_optimization == "Extremely Low VRAM":
-        modules.util.config.global_pipe.enable_model_cpu_offload()
+        modules.util.appstate.global_pipe.enable_model_cpu_offload()
 
     if vaeslicing:
-        modules.util.config.global_pipe.vae.enable_slicing()
+        modules.util.appstate.global_pipe.vae.enable_slicing()
     else:
-        modules.util.config.global_pipe.vae.disable_slicing()
+        modules.util.appstate.global_pipe.vae.disable_slicing()
     if vaetiling:
-        modules.util.config.global_pipe.vae.enable_tiling()
+        modules.util.appstate.global_pipe.vae.enable_tiling()
     else:
-        modules.util.config.global_pipe.vae.disable_tiling()
+        modules.util.appstate.global_pipe.vae.disable_tiling()
 
-    modules.util.config.global_memory_mode = memory_optimization
-    modules.util.config.global_selected_gguf = gguf_file
+    modules.util.appstate.global_memory_mode = memory_optimization
+    modules.util.appstate.global_selected_gguf = gguf_file
+    # modules.util.appstate.global_textencoder = textencoder
     
-    return modules.util.config.global_pipe
+    return modules.util.appstate.global_pipe
 def get_gguf(gguf_user_selection):
     gguf_file, gguf_file_size_str = gguf_user_selection.split(' - ')
     gguf_file_size = float(gguf_file_size_str.replace(' GB', ''))
@@ -83,22 +102,23 @@ def get_gguf(gguf_user_selection):
 
 def generate_images(
     seed, prompt, negative_prompt, width, height, guidance_scale,
-    num_inference_steps, memory_optimization, vaeslicing, vaetiling, gguf_file
+    num_inference_steps, memory_optimization, vaeslicing, vaetiling, gguf_file,
+    text_encoder
 ):
-    if modules.util.config.global_inference_in_progress == True:
+    if modules.util.appstate.global_inference_in_progress == True:
         print(">>>>Inference in progress, can't continue<<<<")
         return None
-    modules.util.config.global_inference_in_progress = True
+    modules.util.appstate.global_inference_in_progress = True
     try:
         gguf_file, gguf_file_size = get_gguf(gguf_file)
         # Get pipeline (either cached or newly loaded)
-        pipe = get_pipeline(memory_optimization, gguf_file, vaeslicing, vaetiling)
-        generator = torch.Generator(device="cuda").manual_seed(seed)
+        pipe = get_pipeline(memory_optimization, gguf_file, vaeslicing, vaetiling, text_encoder)
+        generator = torch.Generator(device="cpu").manual_seed(seed)
 
         progress_bar = gr.Progress(track_tqdm=True)
 
         def callback_on_step_end(pipe, i, t, callback_kwargs):
-            progress_bar(i / num_inference_steps, desc=f"Generating video (Step {i}/{num_inference_steps})")
+            progress_bar(i / num_inference_steps, desc=f"Generating image (Step {i}/{num_inference_steps})")
             return callback_kwargs
 
         # Prepare inference parameters
@@ -130,7 +150,7 @@ def generate_images(
         # Save the image
         image.save(output_path)
         print(f"Image generated: {output_path}")
-        modules.util.config.global_inference_in_progress = False
+        modules.util.appstate.global_inference_in_progress = False
         # Add to gallery items
         gallery_items.append((output_path, "Flex.1-alpha"))
     
@@ -139,26 +159,37 @@ def generate_images(
         print(f"Error during inference: {str(e)}")
         return None
     finally:
-        modules.util.config.global_inference_in_progress = False
+        modules.util.appstate.global_inference_in_progress = False
 
 def create_flex1_alpha_gguf_tab():
     with gr.Row():
         with gr.Column():
-            flex1_alpha_gguf_memory_optimization = gr.Radio(
-                choices=["No optimization", "Low VRAM", "Extremely Low VRAM"],
-                label="Memory Optimization",
-                value="Low VRAM",
-                interactive=True
-            )
+            with gr.Row():
+                flex1_alpha_gguf_memory_optimization = gr.Radio(
+                    choices=["No optimization", "Low VRAM", "Extremely Low VRAM"],
+                    label="Memory Optimization",
+                    value="Low VRAM",
+                    interactive=True
+                )
+            gr.Markdown("### VAE Options")
+            with gr.Row():
+                flex1_alpha_gguf_vaeslicing = gr.Checkbox(label="VAE slicing", value=True, interactive=True)
+                flex1_alpha_gguf_vaetiling = gr.Checkbox(label="VAE Tiling", value=True, interactive=True)
         with gr.Column():
-            flex1_alpha_gguf_vaeslicing = gr.Checkbox(label="VAE slicing", value=True, interactive=True)
-            flex1_alpha_gguf_vaetiling = gr.Checkbox(label="VAE Tiling", value=True, interactive=True)
-        with gr.Column():
-            flex1_alpha_gguf_gguf_dropdown = gr.Dropdown(
-                choices=gguf_list,
-                value="Flex.1-alpha-Q4_K_M.gguf - 4.88 GB",
-                label="Select GGUF"
-            )
+            with gr.Row():
+                flex1_alpha_gguf_gguf_dropdown = gr.Dropdown(
+                    choices=gguf_list,
+                    value="Flex.1-alpha-Q6_K.gguf - 6.91 GB",
+                    label="Select GGUF"
+                )
+            with gr.Row():
+                flex1_alpha_text_encoder = gr.Radio(
+                    choices=["Clip encoder", "T5 encoder"],
+                    label="Text encoder",
+                    value="Clip encoder",
+                    interactive=True,
+                    visible=False
+                )
     with gr.Row():
         with gr.Column():
             flex1_alpha_gguf_prompt_input = gr.Textbox(
@@ -216,7 +247,8 @@ def create_flex1_alpha_gguf_tab():
         inputs=[
             seed_input, flex1_alpha_gguf_prompt_input, flex1_alpha_gguf_negative_prompt_input, flex1_alpha_gguf_width_input, 
             flex1_alpha_gguf_height_input, flex1_alpha_gguf_guidance_scale_slider, flex1_alpha_gguf_num_inference_steps_input, 
-            flex1_alpha_gguf_memory_optimization, flex1_alpha_gguf_vaeslicing, flex1_alpha_gguf_vaetiling, flex1_alpha_gguf_gguf_dropdown
+            flex1_alpha_gguf_memory_optimization, flex1_alpha_gguf_vaeslicing, flex1_alpha_gguf_vaetiling, 
+            flex1_alpha_gguf_gguf_dropdown, flex1_alpha_text_encoder,
         ],
         outputs=[output_gallery]
     )

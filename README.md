@@ -2,13 +2,13 @@
 
 <h2 align='center'>Supported Text-2-Image models</h2>
 <div align='center'>
-	<!--a href='https://huggingface.co/ostris/Flex.1-alpha'><img src='https://img.shields.io/badge/Flex.1_alpha-blue'></a-->
 	<a href='https://huggingface.co/Alpha-VLLM/Lumina-Image-2.0'><img src='https://img.shields.io/badge/Lumina_Image_2.0-blue'></a>
     <a href='https://github.com/NVlabs/Sana'><img src='https://img.shields.io/badge/Sana_2K_4K-red'></a>
 	<a href='https://github.com/Tencent/HunyuanDiT'><img src='https://img.shields.io/badge/HunyuanDIT-blue'></a>
 	<a href='https://github.com/THUDM/CogView3'><img src='https://img.shields.io/badge/CogView_3_Plus-red'></a>
 	<a href='https://huggingface.co/Alpha-VLLM/Lumina-Next-SFT-diffusers'><img src='https://img.shields.io/badge/Lumina_Next_SFT-blue'></a>
 	<a href='https://github.com/ai-forever/Kandinsky-3'><img src='https://img.shields.io/badge/Kandinsky3-red'></a>
+	<a href='https://huggingface.co/ostris/Flex.1-alpha'><img src='https://img.shields.io/badge/Flex.1_alpha-blue'></a>
 </div>
 
 <h2 align='center'>Supported Text-2-Video models</h2>

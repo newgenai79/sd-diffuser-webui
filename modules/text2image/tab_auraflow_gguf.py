@@ -6,9 +6,8 @@ import torch
 import gradio as gr
 import numpy as np
 import os
-import modules.util.config
+import modules.util.appstate
 from datetime import datetime
-from diffusers.utils import export_to_video
 from diffusers import AuraFlowPipeline, AuraFlowTransformer2DModel
 from diffusers import GGUFQuantizationConfig
 from modules.util.utilities import clear_previous_model_memory
@@ -41,12 +40,12 @@ def random_seed():
 def get_pipeline(memory_optimization, gguf_file, vaeslicing, vaetiling):
     print("----auraflow mode: ", memory_optimization, gguf_file, vaeslicing, vaetiling)
     # If model is already loaded with same configuration, reuse it
-    if (modules.util.config.global_pipe is not None and 
-        type(modules.util.config.global_pipe).__name__ == "AuraFlowPipeline" and
-        modules.util.config.global_selected_gguf == gguf_file and
-        modules.util.config.global_memory_mode == memory_optimization):
+    if (modules.util.appstate.global_pipe is not None and 
+        type(modules.util.appstate.global_pipe).__name__ == "AuraFlowPipeline" and
+        modules.util.appstate.global_selected_gguf == gguf_file and
+        modules.util.appstate.global_memory_mode == memory_optimization):
         print(">>>>Reusing auraflow pipe<<<<")
-        return modules.util.config.global_pipe
+        return modules.util.appstate.global_pipe
     else:
         clear_previous_model_memory()
     
@@ -57,27 +56,27 @@ def get_pipeline(memory_optimization, gguf_file, vaeslicing, vaetiling):
         torch_dtype=torch.bfloat16,
     )
 
-    modules.util.config.global_pipe = AuraFlowPipeline.from_pretrained(
+    modules.util.appstate.global_pipe = AuraFlowPipeline.from_pretrained(
         "fal/AuraFlow-v0.3",
         transformer=transformer,
         torch_dtype=torch.bfloat16,
     )
     if memory_optimization == "Low VRAM":
-        modules.util.config.global_pipe.enable_model_cpu_offload()
+        modules.util.appstate.global_pipe.enable_model_cpu_offload()
 
     if vaeslicing:
-        modules.util.config.global_pipe.vae.enable_slicing()
+        modules.util.appstate.global_pipe.vae.enable_slicing()
     else:
-        modules.util.config.global_pipe.vae.disable_slicing()
+        modules.util.appstate.global_pipe.vae.disable_slicing()
     if vaetiling:
-        modules.util.config.global_pipe.vae.enable_tiling()
+        modules.util.appstate.global_pipe.vae.enable_tiling()
     else:
-        modules.util.config.global_pipe.vae.disable_tiling()
+        modules.util.appstate.global_pipe.vae.disable_tiling()
 
-    modules.util.config.global_memory_mode = memory_optimization
-    modules.util.config.global_selected_gguf = gguf_file
+    modules.util.appstate.global_memory_mode = memory_optimization
+    modules.util.appstate.global_selected_gguf = gguf_file
     
-    return modules.util.config.global_pipe
+    return modules.util.appstate.global_pipe
 def get_gguf(gguf_user_selection):
     gguf_file, gguf_file_size_str = gguf_user_selection.split(' - ')
     gguf_file_size = float(gguf_file_size_str.replace(' GB', ''))
@@ -87,10 +86,10 @@ def generate_images(
     seed, prompt, negative_prompt, width, height, guidance_scale,
     num_inference_steps, memory_optimization, vaeslicing, vaetiling, gguf_file
 ):
-    if modules.util.config.global_inference_in_progress == True:
+    if modules.util.appstate.global_inference_in_progress == True:
         print(">>>>Inference in progress, can't continue<<<<")
         return None
-    modules.util.config.global_inference_in_progress = True
+    modules.util.appstate.global_inference_in_progress = True
     try:
         gguf_file, gguf_file_size = get_gguf(gguf_file)
         # Get pipeline (either cached or newly loaded)
@@ -100,7 +99,7 @@ def generate_images(
         progress_bar = gr.Progress(track_tqdm=True)
 
         def callback_on_step_end(pipe, i, t, callback_kwargs):
-            progress_bar(i / num_inference_steps, desc=f"Generating video (Step {i}/{num_inference_steps})")
+            progress_bar(i / num_inference_steps, desc=f"Generating image (Step {i}/{num_inference_steps})")
             return callback_kwargs
         """
         # Prepare inference parameters
@@ -130,7 +129,7 @@ def generate_images(
         # Save the image
         image.save(output_path)
         print(f"Image generated: {output_path}")
-        modules.util.config.global_inference_in_progress = False
+        modules.util.appstate.global_inference_in_progress = False
         # Add to gallery items
         gallery_items.append((output_path, "AuraFlow"))
     
@@ -139,7 +138,7 @@ def generate_images(
         print(f"Error during inference: {str(e)}")
         return None
     finally:
-        modules.util.config.global_inference_in_progress = False
+        modules.util.appstate.global_inference_in_progress = False
 
 def create_auraflow_gguf_tab():
     with gr.Row():

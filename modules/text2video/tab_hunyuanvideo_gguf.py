@@ -6,7 +6,7 @@ import torch
 import gradio as gr
 import numpy as np
 import os
-import modules.util.config
+import modules.util.appstate
 from datetime import datetime
 from diffusers.utils import export_to_video
 from diffusers import HunyuanVideoPipeline, HunyuanVideoTransformer3DModel
@@ -40,12 +40,12 @@ def random_seed():
 def get_pipeline(memory_optimization, gguf_file, vaeslicing, vaetiling):
     print("----hunyuanvideo mode: ", memory_optimization, gguf_file, vaeslicing, vaetiling)
     # If model is already loaded with same configuration, reuse it
-    if (modules.util.config.global_pipe is not None and 
-        type(modules.util.config.global_pipe).__name__ == "HunyuanVideoPipeline" and
-        modules.util.config.global_selected_gguf == gguf_file and
-        modules.util.config.global_memory_mode == memory_optimization):
+    if (modules.util.appstate.global_pipe is not None and 
+        type(modules.util.appstate.global_pipe).__name__ == "HunyuanVideoPipeline" and
+        modules.util.appstate.global_selected_gguf == gguf_file and
+        modules.util.appstate.global_memory_mode == memory_optimization):
         print(">>>>Reusing hunyuanvideo pipe<<<<")
-        return modules.util.config.global_pipe
+        return modules.util.appstate.global_pipe
     else:
         clear_previous_model_memory()
     
@@ -55,35 +55,35 @@ def get_pipeline(memory_optimization, gguf_file, vaeslicing, vaetiling):
         quantization_config=GGUFQuantizationConfig(compute_dtype=torch.bfloat16),
         torch_dtype=torch.bfloat16,
     )
-    modules.util.config.global_pipe = HunyuanVideoPipeline.from_pretrained(
+    modules.util.appstate.global_pipe = HunyuanVideoPipeline.from_pretrained(
         "hunyuanvideo-community/HunyuanVideo", 
         transformer=transformer,
         torch_dtype=torch.float16
     )
     if memory_optimization == "Low VRAM":
-        modules.util.config.global_pipe.enable_model_cpu_offload()
+        modules.util.appstate.global_pipe.enable_model_cpu_offload()
 
     if vaeslicing:
-        modules.util.config.global_pipe.vae.enable_slicing()
+        modules.util.appstate.global_pipe.vae.enable_slicing()
     else:
-        modules.util.config.global_pipe.vae.disable_slicing()
+        modules.util.appstate.global_pipe.vae.disable_slicing()
     if vaetiling:
-        modules.util.config.global_pipe.vae.enable_tiling()
+        modules.util.appstate.global_pipe.vae.enable_tiling()
     else:
-        modules.util.config.global_pipe.vae.disable_tiling()
+        modules.util.appstate.global_pipe.vae.disable_tiling()
 
-    modules.util.config.global_memory_mode = memory_optimization
-    modules.util.config.global_selected_gguf = gguf_file
-    return modules.util.config.global_pipe
+    modules.util.appstate.global_memory_mode = memory_optimization
+    modules.util.appstate.global_selected_gguf = gguf_file
+    return modules.util.appstate.global_pipe
 
 def generate_video(
     seed, prompt, width, height, fps,
     num_inference_steps, num_frames, memory_optimization, vaeslicing, vaetiling, gguf_file
 ):
-    if modules.util.config.global_inference_in_progress == True:
+    if modules.util.appstate.global_inference_in_progress == True:
         print(">>>>Inference in progress, can't continue<<<<")
         return None
-    modules.util.config.global_inference_in_progress = True
+    modules.util.appstate.global_inference_in_progress = True
     try:
         gguf_file, gguf_file_size = get_gguf(gguf_file)
         # Get pipeline (either cached or newly loaded)
@@ -121,14 +121,14 @@ def generate_video(
         # Save the video
         export_to_video(video, output_path, fps=fps)
         print(f"Video generated: {output_path}")
-        modules.util.config.global_inference_in_progress = False
+        modules.util.appstate.global_inference_in_progress = False
         
         return output_path
     except Exception as e:
         print(f"Error during inference: {str(e)}")
         return None
     finally:
-        modules.util.config.global_inference_in_progress = False
+        modules.util.appstate.global_inference_in_progress = False
 
 def create_hunyuanvideo_gguf_tab():
     with gr.Row():

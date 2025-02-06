@@ -6,7 +6,7 @@ import torch
 import gradio as gr
 import numpy as np
 import os
-import modules.util.config
+import modules.util.appstate
 from datetime import datetime
 from diffusers.utils import export_to_video
 from diffusers import CogVideoXImageToVideoPipeline
@@ -21,45 +21,45 @@ def random_seed():
 def get_pipeline(memory_optimization, vaeslicing, vaetiling):
     print("----CogVideoXImageToVideoPipeline mode: ", memory_optimization, vaeslicing, vaetiling)
     # If model is already loaded with same configuration, reuse it
-    if (modules.util.config.global_pipe is not None and 
-        type(modules.util.config.global_pipe).__name__ == "CogVideoXImageToVideoPipeline" and
-        modules.util.config.global_memory_mode == memory_optimization):
+    if (modules.util.appstate.global_pipe is not None and 
+        type(modules.util.appstate.global_pipe).__name__ == "CogVideoXImageToVideoPipeline" and
+        modules.util.appstate.global_memory_mode == memory_optimization):
         print(">>>>Reusing cogvideox155b pipe<<<<")
-        return modules.util.config.global_pipe
+        return modules.util.appstate.global_pipe
     else:
         clear_previous_model_memory()
     
-    modules.util.config.global_pipe = CogVideoXImageToVideoPipeline.from_pretrained(
+    modules.util.appstate.global_pipe = CogVideoXImageToVideoPipeline.from_pretrained(
         "THUDM/CogVideoX1.5-5B-I2V",
         torch_dtype=torch.bfloat16
     )
 
     if memory_optimization == "Low VRAM":
-        modules.util.config.global_pipe.enable_model_cpu_offload()
+        modules.util.appstate.global_pipe.enable_model_cpu_offload()
     elif memory_optimization == "Extremely Low VRAM":
-        modules.util.config.global_pipe.enable_sequential_cpu_offload()
+        modules.util.appstate.global_pipe.enable_sequential_cpu_offload()
 
     if vaeslicing:
-        modules.util.config.global_pipe.vae.enable_slicing()
+        modules.util.appstate.global_pipe.vae.enable_slicing()
     else:
-        modules.util.config.global_pipe.vae.disable_slicing()
+        modules.util.appstate.global_pipe.vae.disable_slicing()
     if vaetiling:
-        modules.util.config.global_pipe.vae.enable_tiling()
+        modules.util.appstate.global_pipe.vae.enable_tiling()
     else:
-        modules.util.config.global_pipe.vae.disable_tiling()
+        modules.util.appstate.global_pipe.vae.disable_tiling()
 
-    modules.util.config.global_memory_mode = memory_optimization
+    modules.util.appstate.global_memory_mode = memory_optimization
     
-    return modules.util.config.global_pipe
+    return modules.util.appstate.global_pipe
 
 def generate_video(
     input_image, guidance_scale, seed, prompt, negative_prompt, width, height, fps,
     num_inference_steps, num_frames, use_dynamic_cfg, memory_optimization, vaeslicing, vaetiling
 ):
-    if modules.util.config.global_inference_in_progress == True:
+    if modules.util.appstate.global_inference_in_progress == True:
         print(">>>>Inference in progress, can't continue<<<<")
         return None
-    modules.util.config.global_inference_in_progress = True
+    modules.util.appstate.global_inference_in_progress = True
     try:
         # Get pipeline (either cached or newly loaded)
         pipe = get_pipeline(memory_optimization, vaeslicing, vaetiling)
@@ -100,14 +100,14 @@ def generate_video(
         # Save the video
         export_to_video(video, output_path, fps=fps)
         print(f"Video generated: {output_path}")
-        modules.util.config.global_inference_in_progress = False
+        modules.util.appstate.global_inference_in_progress = False
         
         return output_path
     except Exception as e:
         print(f"Error during inference: {str(e)}")
         return None
     finally:
-        modules.util.config.global_inference_in_progress = False
+        modules.util.appstate.global_inference_in_progress = False
 
 def create_cogvideox155b_i2v_tab():
     with gr.Row():

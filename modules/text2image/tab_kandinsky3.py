@@ -6,7 +6,7 @@ import torch
 import gradio as gr
 import numpy as np
 import os
-import modules.util.config
+import modules.util.appstate
 from datetime import datetime
 from diffusers import AutoPipelineForText2Image
 from modules.util.utilities import clear_previous_model_memory
@@ -20,36 +20,36 @@ def random_seed():
 def get_pipeline(memory_optimization):
     print("----kandinsky3 mode: ", memory_optimization)
     # If model is already loaded with same configuration, reuse it
-    if (modules.util.config.global_pipe is not None and 
-        type(modules.util.config.global_pipe).__name__ == "Kandinsky3Pipeline" and
-        modules.util.config.global_memory_mode == memory_optimization):
+    if (modules.util.appstate.global_pipe is not None and 
+        type(modules.util.appstate.global_pipe).__name__ == "Kandinsky3Pipeline" and
+        modules.util.appstate.global_memory_mode == memory_optimization):
         print(">>>>Reusing kandinsky3 pipe<<<<")
-        return modules.util.config.global_pipe
+        return modules.util.appstate.global_pipe
     else:
         clear_previous_model_memory()
 
-    modules.util.config.global_pipe = AutoPipelineForText2Image.from_pretrained(
+    modules.util.appstate.global_pipe = AutoPipelineForText2Image.from_pretrained(
         "kandinsky-community/kandinsky-3",
         variant="fp16", 
         torch_dtype=torch.float16,
     )
 
     if memory_optimization == "Low VRAM":
-        modules.util.config.global_pipe.enable_model_cpu_offload()
+        modules.util.appstate.global_pipe.enable_model_cpu_offload()
     elif memory_optimization == "Extremely Low VRAM":
-        modules.util.config.global_pipe.enable_sequential_cpu_offload()
-    modules.util.config.global_memory_mode = memory_optimization
+        modules.util.appstate.global_pipe.enable_sequential_cpu_offload()
+    modules.util.appstate.global_memory_mode = memory_optimization
     
-    return modules.util.config.global_pipe
+    return modules.util.appstate.global_pipe
 
 def generate_images(
     seed, prompt, negative_prompt, width, height, guidance_scale,
     num_inference_steps, memory_optimization,
 ):
-    if modules.util.config.global_inference_in_progress == True:
+    if modules.util.appstate.global_inference_in_progress == True:
         print(">>>>Inference in progress, can't continue<<<<")
         return None
-    modules.util.config.global_inference_in_progress = True
+    modules.util.appstate.global_inference_in_progress = True
     try:
         # Get pipeline (either cached or newly loaded)
         pipe = get_pipeline(memory_optimization)
@@ -89,7 +89,7 @@ def generate_images(
         # Save the image
         image.save(output_path)
         print(f"Image generated: {output_path}")
-        modules.util.config.global_inference_in_progress = False
+        modules.util.appstate.global_inference_in_progress = False
         # Add to gallery items
         gallery_items.append((output_path, "Kandinsky-3"))
         
@@ -98,7 +98,7 @@ def generate_images(
         print(f"Error during inference: {str(e)}")
         return None
     finally:
-        modules.util.config.global_inference_in_progress = False
+        modules.util.appstate.global_inference_in_progress = False
 
 def create_kandinsky3_tab():
     with gr.Row():

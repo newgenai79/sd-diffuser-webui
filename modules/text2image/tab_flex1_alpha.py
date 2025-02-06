@@ -6,7 +6,7 @@ import torch
 import gradio as gr
 import numpy as np
 import os
-import modules.util.config
+import modules.util.appstate
 from datetime import datetime
 from diffusers import FluxPipeline, FluxTransformer2DModel
 from modules.util.utilities import clear_previous_model_memory
@@ -22,12 +22,12 @@ def get_pipeline(memory_optimization, quantization, vaeslicing, vaetiling):
     dtype = torch.bfloat16
     print("----Flex.1_alpha mode: ",memory_optimization, quantization, vaeslicing, vaetiling)
     # If model is already loaded with same configuration, reuse it
-    if (modules.util.config.global_pipe is not None and 
-        type(modules.util.config.global_pipe).__name__ == "FluxPipeline" and
-        modules.util.config.global_quantization == quantization and
-        modules.util.config.global_memory_mode == memory_optimization):
+    if (modules.util.appstate.global_pipe is not None and 
+        type(modules.util.appstate.global_pipe).__name__ == "FluxPipeline" and
+        modules.util.appstate.global_quantization == quantization and
+        modules.util.appstate.global_memory_mode == memory_optimization):
         print(">>>>Reusing Flex.1_alpha pipe<<<<")
-        return modules.util.config.global_pipe
+        return modules.util.appstate.global_pipe
     else:
         clear_previous_model_memory()
         
@@ -46,39 +46,39 @@ def get_pipeline(memory_optimization, quantization, vaeslicing, vaetiling):
             subfolder="transformer",
             torch_dtype=dtype,
         )
-    modules.util.config.global_pipe = FluxPipeline.from_pretrained(
+    modules.util.appstate.global_pipe = FluxPipeline.from_pretrained(
         model_id,
         transformer=transformer,
         torch_dtype=dtype,
     )
     if memory_optimization == "Low VRAM":
-        modules.util.config.global_pipe.enable_model_cpu_offload()
+        modules.util.appstate.global_pipe.enable_model_cpu_offload()
     elif memory_optimization == "Extremely Low VRAM":
-        modules.util.config.global_pipe.enable_sequential_cpu_offload()
+        modules.util.appstate.global_pipe.enable_sequential_cpu_offload()
 
     if vaeslicing:
-        modules.util.config.global_pipe.vae.enable_slicing()
+        modules.util.appstate.global_pipe.vae.enable_slicing()
     else:
-        modules.util.config.global_pipe.vae.disable_slicing()
+        modules.util.appstate.global_pipe.vae.disable_slicing()
     if vaetiling:
-        modules.util.config.global_pipe.vae.enable_tiling()
+        modules.util.appstate.global_pipe.vae.enable_tiling()
     else:
-        modules.util.config.global_pipe.vae.disable_tiling()
+        modules.util.appstate.global_pipe.vae.disable_tiling()
         
     # Update global variables
-    modules.util.config.global_memory_mode = memory_optimization
-    modules.util.config.global_quantization = quantization
-    return modules.util.config.global_pipe
+    modules.util.appstate.global_memory_mode = memory_optimization
+    modules.util.appstate.global_quantization = quantization
+    return modules.util.appstate.global_pipe
 
 def generate_images(
     seed, prompt, negative_prompt, width, height, guidance_scale,
     num_inference_steps, memory_optimization, quantization, vaeslicing, vaetiling
 ):
 
-    if modules.util.config.global_inference_in_progress == True:
+    if modules.util.appstate.global_inference_in_progress == True:
         print(">>>>Inference in progress, can't continue<<<<")
         return None
-    modules.util.config.global_inference_in_progress = True
+    modules.util.appstate.global_inference_in_progress = True
     try:
         # Get pipeline (either cached or newly loaded)
         pipe = get_pipeline(memory_optimization, quantization, vaeslicing, vaetiling)
@@ -119,7 +119,7 @@ def generate_images(
         # Save the image
         image.save(output_path)
         print(f"Image generated: {output_path}")
-        modules.util.config.global_inference_in_progress = False
+        modules.util.appstate.global_inference_in_progress = False
         # Add to gallery items
         gallery_items.append((output_path, "Flex.1-alpha"))
         
@@ -128,7 +128,7 @@ def generate_images(
         print(f"Error during inference: {str(e)}")
         return None
     finally:
-        modules.util.config.global_inference_in_progress = False
+        modules.util.appstate.global_inference_in_progress = False
 
 def create_flex1_alpha_tab():
     with gr.Row():
