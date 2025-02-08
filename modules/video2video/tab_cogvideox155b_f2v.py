@@ -11,6 +11,7 @@ from datetime import datetime
 from diffusers.utils import export_to_video, load_video
 from diffusers import CogVideoXFunControlPipeline, DDIMScheduler
 from modules.util.utilities import clear_previous_model_memory
+from modules.util.appstate import state_manager
 
 MAX_SEED = np.iinfo(np.int32).max
 OUTPUT_DIR = "output/v2v/cogvideox155b"
@@ -118,17 +119,18 @@ def generate_video(
         modules.util.appstate.global_inference_in_progress = False
 
 def create_cogvideox155b_f2v_tab():
+    initial_state = state_manager.get_state("cogvideox155b_f2v") or {}
     with gr.Row():
         with gr.Column():
             cogvideox155bf2v_memory_optimization = gr.Radio(
                 choices=["No optimization", "Low VRAM", "Extremely Low VRAM"],
                 label="Memory Optimization",
-                value="Extremely Low VRAM",
+                value=initial_state.get("memory_optimization", "Extremely Low VRAM"),
                 interactive=True
             )
         with gr.Column():
-            cogvideox155bf2v_vaeslicing = gr.Checkbox(label="VAE slicing", value=True, interactive=True)
-            cogvideox155bf2v_vaetiling = gr.Checkbox(label="VAE Tiling", value=True, interactive=True)
+            cogvideox155bf2v_vaeslicing = gr.Checkbox(label="VAE Slicing", value=initial_state.get("vaeslicing", True), interactive=True)
+            cogvideox155bf2v_vaetiling = gr.Checkbox(label="VAE Tiling", value=initial_state.get("vaetiling", True), interactive=True)
     with gr.Row():
         with gr.Column():
             cogvideox155bf2v_input_video = gr.Video(label="Input Video")
@@ -146,35 +148,65 @@ def create_cogvideox155b_f2v_tab():
             with gr.Row():
                 cogvideox155bf2v_width_input = gr.Number(
                     label="Width", 
-                    value=512, 
+                    value=initial_state.get("width", 512),
                     interactive=True
                 )
                 cogvideox155bf2v_height_input = gr.Number(
                     label="Height", 
-                    value=320, 
+                    value=initial_state.get("height", 320), 
                     interactive=True
                 )
                 seed_input = gr.Number(label="Seed", value=0, minimum=0, maximum=MAX_SEED, interactive=True)
                 random_button = gr.Button("Randomize Seed")
+                save_state_button = gr.Button("Save State")
             with gr.Row():
                 cogvideox155bf2v_fps_input = gr.Number(
                     label="FPS", 
-                    value=15,
+                    value=initial_state.get("fps", 8),
                     interactive=True
                 )
                 cogvideox155bf2v_num_inference_steps_input = gr.Number(
                     label="Number of Inference Steps", 
-                    value=50,
+                    value=initial_state.get("inference_steps", 50),
                     interactive=True
                 )
                 cogvideox155bf2v_use_dynamic_cfg = gr.Checkbox(label="Use Dynamic CFG", value=True)
-                cogvideox155bf2v_guidance_scale = gr.Slider(label="Guidance Scale", minimum=1, maximum=20, step=0.1, value=6)
+                cogvideox155bf2v_guidance_scale = gr.Slider(label="Guidance Scale", minimum=1, maximum=20, step=0.1, value=initial_state.get("guidance_scale", 6.0))
     with gr.Row():
         generate_button = gr.Button("Generate video")
     output_video = gr.Video(label="Generated Video", show_label=True)
 
+    def save_current_state(memory_optimization, vaeslicing, vaetiling, width, height, fps, inference_steps, guidance_scale):
+        state_dict = {
+            "memory_optimization": memory_optimization,
+            "vaeslicing": vaeslicing,
+            "vaetiling": vaetiling,
+            "width": int(width),
+            "height": int(height),
+            "fps": fps,
+            "inference_steps": inference_steps,
+            "guidance_scale": guidance_scale
+        }
+        # print("Saving state:", state_dict)
+        initial_state = state_manager.get_state("cogvideox155b_f2v") or {}
+        return state_manager.save_state("cogvideox155b_f2v", state_dict)
+
     # Event handlers
     random_button.click(fn=random_seed, outputs=[seed_input])
+    save_state_button.click(
+        fn=save_current_state,
+        inputs=[
+            cogvideox155bf2v_memory_optimization, 
+            cogvideox155bf2v_vaeslicing,
+            cogvideox155bf2v_vaetiling,
+            cogvideox155bf2v_width_input, 
+            cogvideox155bf2v_height_input, 
+            cogvideox155bf2v_fps_input, 
+            cogvideox155bf2v_num_inference_steps_input,
+            cogvideox155bf2v_guidance_scale
+        ],
+        outputs=[gr.Textbox(visible=False)]
+    )
 
     generate_button.click(
         fn=generate_video,

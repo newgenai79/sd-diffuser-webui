@@ -147,8 +147,8 @@ def create_flex1_alpha_tab():
                 interactive=True
             )
         with gr.Column(scale=0):
-            flex1_alpha_vaeslicing = gr.Checkbox(label="VAE slicing", value=True, interactive=True)
-            flex1_alpha_vaetiling = gr.Checkbox(label="VAE Tiling", value=True, interactive=True)
+            flex1_alpha_vaeslicing = gr.Checkbox(label="VAE Slicing", value=initial_state.get("vaeslicing", True), interactive=True)
+            flex1_alpha_vaetiling = gr.Checkbox(label="VAE Tiling", value=initial_state.get("vaetiling", True), interactive=True)
     with gr.Row():
         with gr.Column():
             flex1_alpha_prompt_input = gr.Textbox(

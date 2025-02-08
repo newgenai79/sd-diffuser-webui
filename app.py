@@ -15,10 +15,10 @@ sys.path.append(tabs_dir)
 
 # Text 2 Image
 from modules.text2image.tab_sana import create_sana_tab
-from modules.text2image.tab_flex1_alpha import create_flex1_alpha_tab
 from modules.text2image.tab_flex1_alpha_gguf import create_flex1_alpha_gguf_tab
 from modules.text2image.tab_lumina import create_lumina_tab
-from modules.text2image.tab_lumina2 import create_lumina2_tab
+from modules.text2image.tab_lumina2_bnb import create_lumina2_BnB_tab
+# from modules.text2image.tab_lumina2_gguf import create_lumina2_gguf_tab
 from modules.text2image.tab_cogview3plus import create_cogView3Plus_tab
 from modules.text2image.tab_hunyuandit import create_hunyuandit_tab
 from modules.text2image.tab_kandinsky3 import create_kandinsky3_tab
@@ -45,14 +45,14 @@ with gr.Blocks() as dwebui:
             with gr.Tabs():
                 with gr.Tab("Sana"):
                     create_sana_tab()
-                # with gr.Tab("Flex.1-alpha"):
-                    # create_flex1_alpha_tab()
+                with gr.Tab("Lumina Image 2.0 - BnB"):
+                    create_lumina2_BnB_tab()
+                # with gr.Tab("Lumina Image 2.0 - GGUF"):
+                    # create_lumina2_gguf_tab()
                 with gr.Tab("Flex.1-alpha-GGUF"):
                     create_flex1_alpha_gguf_tab()
                 with gr.Tab("Lumina Next SFT"):
                     create_lumina_tab()
-                with gr.Tab("Lumina Image 2.0"):
-                    create_lumina2_tab()
                 with gr.Tab("CogView3 Plus"):
                     create_cogView3Plus_tab()
                 with gr.Tab("Hunyuan DiT"):

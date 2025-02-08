@@ -12,6 +12,7 @@ from diffusers.utils import export_to_video
 from diffusers import HunyuanVideoPipeline, HunyuanVideoTransformer3DModel
 from diffusers import BitsAndBytesConfig
 from modules.util.utilities import clear_previous_model_memory
+from modules.util.appstate import state_manager
 
 MAX_SEED = np.iinfo(np.int32).max
 OUTPUT_DIR = "output/t2v/hunyuanvideo"
@@ -118,22 +119,23 @@ def generate_video(
         modules.util.appstate.global_inference_in_progress = False
 
 def create_hunyuanvideo_bnb_tab():
+    initial_state = state_manager.get_state("hunyuanvideo_bnb") or {}
     with gr.Row():
         with gr.Column():
             hunyuanvideo_memory_optimization = gr.Radio(
                 choices=["No optimization", "Low VRAM"],
                 label="Memory Optimization",
-                value="Low VRAM",
+                value=initial_state.get("memory_optimization", "Low VRAM"),
                 interactive=True
             )
         with gr.Column():
-            hunyuanvideo_vaeslicing = gr.Checkbox(label="VAE slicing", value=True, interactive=True)
-            hunyuanvideo_vaetiling = gr.Checkbox(label="VAE Tiling", value=True, interactive=True)
+            hunyuanvideo_vaeslicing = gr.Checkbox(label="VAE Slicing", value=initial_state.get("vaeslicing", True), interactive=True)
+            hunyuanvideo_vaetiling = gr.Checkbox(label="VAE Tiling", value=initial_state.get("vaetiling", True), interactive=True)
         with gr.Column():
             hunyuanvideo_quantization = gr.Radio(
                 choices=["int4", "int8"],
                 label="BitsnBytes quantization",
-                value="int4",
+                value=initial_state.get("quantization", "int4"),
                 interactive=True
             )
     with gr.Row():
@@ -147,38 +149,70 @@ def create_hunyuanvideo_bnb_tab():
             with gr.Row():
                 hunyuanvideo_width_input = gr.Number(
                     label="Width", 
-                    value=512, 
+                    value=initial_state.get("width", 512),
                     interactive=True
                 )
                 hunyuanvideo_height_input = gr.Number(
                     label="Height", 
-                    value=320, 
+                    value=initial_state.get("height", 512),
                     interactive=True
                 )
                 seed_input = gr.Number(label="Seed", value=0, minimum=0, maximum=MAX_SEED, interactive=True)
                 random_button = gr.Button("Randomize Seed")
+                save_state_button = gr.Button("Save State")
             with gr.Row():
                 hunyuanvideo_fps_input = gr.Number(
                     label="FPS", 
-                    value=24,
+                    value=initial_state.get("fps", 24),
                     interactive=True
                 )
                 hunyuanvideo_num_inference_steps_input = gr.Number(
                     label="Number of Inference Steps", 
-                    value=50,
+                    value=initial_state.get("inference_steps", 50),
                     interactive=True
                 )
                 hunyuanvideo_num_frames_input = gr.Number(
                     label="Number of frames", 
-                    value=61,
+                    value=initial_state.get("no_of_frames", 61),
                     interactive=True
                 )
     with gr.Row():
         generate_button = gr.Button("Generate video")
     output_video = gr.Video(label="Generated Video", show_label=True)
 
+    def save_current_state(quantization, memory_optimization, vaeslicing, vaetiling, width, height, fps, inference_steps, no_of_frames):
+        state_dict = {
+            "quantization": quantization,
+            "memory_optimization": memory_optimization,
+            "vaeslicing": vaeslicing,
+            "vaetiling": vaetiling,
+            "width": int(width),
+            "height": int(height),
+            "fps": fps,
+            "inference_steps": inference_steps,
+            "no_of_frames": no_of_frames
+        }
+        # print("Saving state:", state_dict)
+        initial_state = state_manager.get_state("hunyuanvideo_bnb") or {}
+        return state_manager.save_state("hunyuanvideo_bnb", state_dict)
+
     # Event handlers
     random_button.click(fn=random_seed, outputs=[seed_input])
+    save_state_button.click(
+        fn=save_current_state,
+        inputs=[
+            hunyuanvideo_quantization,
+            hunyuanvideo_memory_optimization, 
+            hunyuanvideo_vaeslicing,
+            hunyuanvideo_vaetiling,
+            hunyuanvideo_width_input, 
+            hunyuanvideo_height_input, 
+            hunyuanvideo_fps_input, 
+            hunyuanvideo_num_inference_steps_input,
+            hunyuanvideo_num_frames_input
+        ],
+        outputs=[gr.Textbox(visible=False)]
+    )
 
     generate_button.click(
         fn=generate_video,

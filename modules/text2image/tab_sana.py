@@ -10,6 +10,7 @@ import modules.util.appstate
 from datetime import datetime
 from diffusers import SanaPipeline
 from modules.util.utilities import clear_previous_model_memory
+from modules.util.appstate import state_manager
 
 MAX_SEED = np.iinfo(np.int32).max
 OUTPUT_DIR = "output/t2i/Sana"
@@ -70,7 +71,7 @@ def get_pipeline(inference_type, memory_optimization, vaeslicing, vaetiling):
 def generate_images(
     seed, prompt, negative_prompt, width, height, guidance_scale,
     num_inference_steps, memory_optimization, inference_type, 
-    num_images_per_prompt, vaeslicing, vaetiling, 
+    vaeslicing, vaetiling, 
 ):
 
     if modules.util.appstate.global_inference_in_progress == True:
@@ -137,24 +138,25 @@ def generate_images(
         modules.util.appstate.global_inference_in_progress = False
 
 def create_sana_tab():
+    initial_state = state_manager.get_state("sana") or {}
     with gr.Row():
         with gr.Column():
             sana_inference_type = gr.Radio(
                 choices=["Sana 2K", "Sana 4K"],
                 label="Inference type",
-                value="Sana 2K",
+                value=initial_state.get("inference_type", "Sana 2K"),
                 interactive=True
             )
         with gr.Column():
             sana_memory_optimization = gr.Radio(
                 choices=["No optimization", "Low VRAM"],
                 label="Memory Optimization",
-                value="Low VRAM",
+                value=initial_state.get("memory_optimization", "Low VRAM"),
                 interactive=True
             )
         with gr.Column():
-            sana_vaeslicing = gr.Checkbox(label="VAE slicing", value=True, interactive=True)
-            sana_vaetiling = gr.Checkbox(label="VAE Tiling", value=True, interactive=True)
+            sana_vaeslicing = gr.Checkbox(label="VAE Slicing", value=initial_state.get("vaeslicing", True), interactive=True)
+            sana_vaetiling = gr.Checkbox(label="VAE Tiling", value=initial_state.get("vaetiling", True), interactive=True)
     with gr.Row():
         with gr.Column():
             sana_prompt_input = gr.Textbox(
@@ -173,7 +175,7 @@ def create_sana_tab():
             with gr.Row():
                 sana_width_input = gr.Number(
                     label="Width", 
-                    value=2048, 
+                    value=initial_state.get("width", 2048),
                     minimum=512, 
                     maximum=4096, 
                     step=64,
@@ -181,7 +183,7 @@ def create_sana_tab():
                 )
                 sana_height_input = gr.Number(
                     label="Height", 
-                    value=2048, 
+                    value=initial_state.get("width", 2048),
                     minimum=512, 
                     maximum=4096, 
                     step=64,
@@ -189,25 +191,19 @@ def create_sana_tab():
                 )
                 seed_input = gr.Number(label="Seed", value=0, minimum=0, maximum=MAX_SEED, interactive=True)
                 random_button = gr.Button("Randomize Seed")
+                save_state_button = gr.Button("Save State")
             with gr.Row():
                 sana_guidance_scale_slider = gr.Slider(
                     label="Guidance Scale", 
                     minimum=1.0, 
                     maximum=20.0, 
-                    value=7.0, 
+                    value=initial_state.get("guidance_scale", 7.0),
                     step=0.1,
                     interactive=True
                 )
                 sana_num_inference_steps_input = gr.Number(
                     label="Number of Inference Steps", 
-                    value=30,
-                    interactive=True
-                )
-                sana_num_images_per_prompt_input = gr.Number(
-                    label="Number of images/prompt", 
-                    value=1,
-                    minimum=1,
-                    step=1,
+                    value=initial_state.get("inference_steps", 30),
                     interactive=True
                 )
     with gr.Row():
@@ -222,16 +218,45 @@ def create_sana_tab():
     def update_dimensions(selected_type):
         return (4096, 4096) if selected_type == "Sana 4K" else (2048, 2048)
     sana_inference_type.change(update_dimensions, [sana_inference_type], [sana_width_input, sana_height_input])
+
+    def save_current_state(inference_type, memory_optimization, vaeslicing, vaetiling, width, height, guidance_scale, inference_steps):
+        state_dict = {
+            "inference_type": inference_type,
+            "memory_optimization": memory_optimization,
+            "vaeslicing": vaeslicing,
+            "vaetiling": vaetiling,
+            "width": int(width),
+            "height": int(height),
+            "guidance_scale": guidance_scale,
+            "inference_steps": inference_steps
+        }
+        # print("Saving state:", state_dict)
+        initial_state = state_manager.get_state("sana") or {}
+        return state_manager.save_state("sana", state_dict)
+
     # Event handlers
     random_button.click(fn=random_seed, outputs=[seed_input])
+    save_state_button.click(
+        fn=save_current_state,
+        inputs=[
+            sana_inference_type,
+            sana_memory_optimization, 
+            sana_vaeslicing, 
+            sana_vaetiling, 
+            sana_width_input, 
+            sana_height_input, 
+            sana_guidance_scale_slider, 
+            sana_num_inference_steps_input
+        ],
+        outputs=[gr.Textbox(visible=False)]
+    )
 
     generate_button.click(
         fn=generate_images,
         inputs=[
             seed_input, sana_prompt_input, sana_negative_prompt_input, sana_width_input, 
             sana_height_input, sana_guidance_scale_slider, sana_num_inference_steps_input, 
-            sana_memory_optimization, sana_inference_type, sana_num_images_per_prompt_input,
-            sana_vaeslicing, sana_vaetiling, 
+            sana_memory_optimization, sana_inference_type, sana_vaeslicing, sana_vaetiling, 
         ],
         outputs=[output_gallery]
     )

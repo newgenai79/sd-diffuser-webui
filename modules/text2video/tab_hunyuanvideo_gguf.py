@@ -12,6 +12,7 @@ from diffusers.utils import export_to_video
 from diffusers import HunyuanVideoPipeline, HunyuanVideoTransformer3DModel
 from diffusers import GGUFQuantizationConfig
 from modules.util.utilities import clear_previous_model_memory
+from modules.util.appstate import state_manager
 
 MAX_SEED = np.iinfo(np.int32).max
 OUTPUT_DIR = "output/t2v/hunyuanvideo"
@@ -131,74 +132,107 @@ def generate_video(
         modules.util.appstate.global_inference_in_progress = False
 
 def create_hunyuanvideo_gguf_tab():
+    initial_state = state_manager.get_state("hunyuanvideo_gguf") or {}
     with gr.Row():
         with gr.Column():
-            hunyuanvideo_memory_optimization = gr.Radio(
+            hunyuanvideo_gguf_memory_optimization = gr.Radio(
                 choices=["No optimization", "Low VRAM"],
                 label="Memory Optimization",
-                value="Low VRAM",
+                value=initial_state.get("memory_optimization", "Low VRAM"),
                 interactive=True
             )
         with gr.Column():
-            hunyuanvideo_vaeslicing = gr.Checkbox(label="VAE slicing", value=True, interactive=True)
-            hunyuanvideo_vaetiling = gr.Checkbox(label="VAE Tiling", value=True, interactive=True)
+            hunyuanvideo_gguf_vaeslicing = gr.Checkbox(label="VAE Slicing", value=initial_state.get("vaeslicing", True), interactive=True)
+            hunyuanvideo_gguf_vaetiling = gr.Checkbox(label="VAE Tiling", value=initial_state.get("vaetiling", True), interactive=True)
         with gr.Column():
             hunyuanvideo_gguf_dropdown = gr.Dropdown(
                 choices=gguf_list,
-                value="hunyuan-video-t2v-720p-Q3_K_S.gguf - 6.09 GB",
+                value=initial_state.get("gguf", "hunyuan-video-t2v-720p-Q3_K_S.gguf - 6.09 GB"),
                 label="Select GGUF"
             )
     with gr.Row():
         with gr.Column():
-            hunyuanvideo_prompt_input = gr.Textbox(
+            hunyuanvideo_gguf_prompt_input = gr.Textbox(
                 label="Prompt", 
                 lines=3,
                 interactive=True
             )
         with gr.Column():
             with gr.Row():
-                hunyuanvideo_width_input = gr.Number(
+                hunyuanvideo_gguf_width_input = gr.Number(
                     label="Width", 
-                    value=512, 
+                    value=initial_state.get("width", 512),
                     interactive=True
                 )
-                hunyuanvideo_height_input = gr.Number(
+                hunyuanvideo_gguf_height_input = gr.Number(
                     label="Height", 
-                    value=320, 
+                    value=initial_state.get("height", 512),
                     interactive=True
                 )
                 seed_input = gr.Number(label="Seed", value=0, minimum=0, maximum=MAX_SEED, interactive=True)
                 random_button = gr.Button("Randomize Seed")
+                save_state_button = gr.Button("Save State")
             with gr.Row():
-                hunyuanvideo_fps_input = gr.Number(
+                hunyuanvideo_gguf_fps_input = gr.Number(
                     label="FPS", 
-                    value=24,
+                    value=initial_state.get("fps", 24),
                     interactive=True
                 )
-                hunyuanvideo_num_inference_steps_input = gr.Number(
+                hunyuanvideo_gguf_num_inference_steps_input = gr.Number(
                     label="Number of Inference Steps", 
-                    value=50,
+                    value=initial_state.get("inference_steps", 50),
                     interactive=True
                 )
-                hunyuanvideo_num_frames_input = gr.Number(
+                hunyuanvideo_gguf_num_frames_input = gr.Number(
                     label="Number of frames", 
-                    value=61,
+                    value=initial_state.get("no_of_frames", 61),
                     interactive=True
                 )
     with gr.Row():
         generate_button = gr.Button("Generate video")
     output_video = gr.Video(label="Generated Video", show_label=True)
 
+    def save_current_state(gguf, memory_optimization, vaeslicing, vaetiling, width, height, fps, inference_steps, no_of_frames):
+        state_dict = {
+            "gguf": gguf,
+            "memory_optimization": memory_optimization,
+            "vaeslicing": vaeslicing,
+            "vaetiling": vaetiling,
+            "width": int(width),
+            "height": int(height),
+            "fps": fps,
+            "inference_steps": inference_steps,
+            "no_of_frames": no_of_frames
+        }
+        # print("Saving state:", state_dict)
+        initial_state = state_manager.get_state("hunyuanvideo_gguf") or {}
+        return state_manager.save_state("hunyuanvideo_gguf", state_dict)
+
     # Event handlers
     random_button.click(fn=random_seed, outputs=[seed_input])
+    save_state_button.click(
+        fn=save_current_state,
+        inputs=[
+            hunyuanvideo_gguf_dropdown,
+            hunyuanvideo_gguf_memory_optimization, 
+            hunyuanvideo_gguf_vaeslicing,
+            hunyuanvideo_gguf_vaetiling,
+            hunyuanvideo_gguf_width_input, 
+            hunyuanvideo_gguf_height_input, 
+            hunyuanvideo_gguf_fps_input, 
+            hunyuanvideo_gguf_num_inference_steps_input,
+            hunyuanvideo_gguf_num_frames_input
+        ],
+        outputs=[gr.Textbox(visible=False)]
+    )
 
     generate_button.click(
         fn=generate_video,
         inputs=[
-            seed_input, hunyuanvideo_prompt_input, hunyuanvideo_width_input, 
-            hunyuanvideo_height_input, hunyuanvideo_fps_input, hunyuanvideo_num_inference_steps_input, 
-            hunyuanvideo_num_frames_input, hunyuanvideo_memory_optimization, hunyuanvideo_vaeslicing,
-            hunyuanvideo_vaetiling, hunyuanvideo_gguf_dropdown
+            seed_input, hunyuanvideo_gguf_prompt_input, hunyuanvideo_gguf_width_input, 
+            hunyuanvideo_gguf_height_input, hunyuanvideo_gguf_fps_input, hunyuanvideo_gguf_num_inference_steps_input, 
+            hunyuanvideo_gguf_num_frames_input, hunyuanvideo_gguf_memory_optimization, hunyuanvideo_gguf_vaeslicing,
+            hunyuanvideo_gguf_vaetiling, hunyuanvideo_gguf_dropdown
         ],
         outputs=[output_video]
     )

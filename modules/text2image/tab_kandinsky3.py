@@ -10,6 +10,7 @@ import modules.util.appstate
 from datetime import datetime
 from diffusers import AutoPipelineForText2Image
 from modules.util.utilities import clear_previous_model_memory
+from modules.util.appstate import state_manager
 
 MAX_SEED = np.iinfo(np.int32).max
 OUTPUT_DIR = "output/t2i/Kandinsky3"
@@ -101,11 +102,12 @@ def generate_images(
         modules.util.appstate.global_inference_in_progress = False
 
 def create_kandinsky3_tab():
+    initial_state = state_manager.get_state("kandinsky3") or {}
     with gr.Row():
         kandinsky3_memory_optimization = gr.Radio(
             choices=["No optimization", "Low VRAM", "Extremely Low VRAM"],
             label="Memory Optimization",
-            value="Low VRAM",
+            value=initial_state.get("memory_optimization", "Low VRAM"),
             interactive=True
         )
     with gr.Row():
@@ -124,28 +126,29 @@ def create_kandinsky3_tab():
             with gr.Row():
                 kandinsky3_width_input = gr.Number(
                     label="Width", 
-                    value=1024, 
+                    value=initial_state.get("width", 1024),
                     interactive=True
                 )
                 kandinsky3_height_input = gr.Number(
                     label="Height", 
-                    value=1024, 
+                    value=initial_state.get("height", 1024),
                     interactive=True
                 )
                 seed_input = gr.Number(label="Seed", value=0, minimum=0, maximum=MAX_SEED, interactive=True)
                 random_button = gr.Button("Randomize Seed")
+                save_state_button = gr.Button("Save State")
             with gr.Row():
                 kandinsky3_guidance_scale_slider = gr.Slider(
                     label="Guidance Scale", 
                     minimum=1.0, 
                     maximum=20.0, 
-                    value=3.0, 
+                    value=initial_state.get("guidance_scale", 3.0),
                     step=0.1,
                     interactive=True
                 )
                 kandinsky3_num_inference_steps_input = gr.Number(
                     label="Number of Inference Steps", 
-                    value=25,
+                    value=initial_state.get("inference_steps", 25),
                     interactive=True
                 )
     with gr.Row():
@@ -157,8 +160,31 @@ def create_kandinsky3_tab():
         height="auto"
     )
 
+    def save_current_state(memory_optimization, width, height, guidance_scale, inference_steps):
+        state_dict = {
+            "memory_optimization": memory_optimization,
+            "width": int(width),
+            "height": int(height),
+            "guidance_scale": guidance_scale,
+            "inference_steps": inference_steps
+        }
+        # print("Saving state:", state_dict)
+        initial_state = state_manager.get_state("kandinsky3") or {}
+        return state_manager.save_state("kandinsky3", state_dict)
+
     # Event handlers
     random_button.click(fn=random_seed, outputs=[seed_input])
+    save_state_button.click(
+        fn=save_current_state,
+        inputs=[
+            kandinsky3_memory_optimization, 
+            kandinsky3_width_input, 
+            kandinsky3_height_input, 
+            kandinsky3_guidance_scale_slider, 
+            kandinsky3_num_inference_steps_input
+        ],
+        outputs=[gr.Textbox(visible=False)]
+    )
 
     generate_button.click(
         fn=generate_images,

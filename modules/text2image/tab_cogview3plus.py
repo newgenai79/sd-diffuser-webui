@@ -10,6 +10,7 @@ import modules.util.appstate
 from datetime import datetime
 from diffusers import CogView3PlusPipeline
 from modules.util.utilities import clear_previous_model_memory
+from modules.util.appstate import state_manager
 
 MAX_SEED = np.iinfo(np.int32).max
 OUTPUT_DIR = "output/t2i/cogView3Plus"
@@ -124,17 +125,18 @@ def generate_images(
         modules.util.appstate.global_inference_in_progress = False
 
 def create_cogView3Plus_tab():
+    initial_state = state_manager.get_state("cogview3plus") or {}
     with gr.Row():
         with gr.Column():
             cogView3Plus_memory_optimization = gr.Radio(
                 choices=["No optimization", "Low VRAM", "Extremely Low VRAM"],
                 label="Memory Optimization",
-                value="Low VRAM",
+                value=initial_state.get("memory_optimization", "Low VRAM"),
                 interactive=True
             )
         with gr.Column():
-            cogView3Plus_vaeslicing = gr.Checkbox(label="VAE slicing", value=True, interactive=True)
-            cogView3Plus_vaetiling = gr.Checkbox(label="VAE Tiling", value=True, interactive=True)
+            cogView3Plus_vaeslicing = gr.Checkbox(label="VAE Slicing", value=initial_state.get("vaeslicing", True), interactive=True)
+            cogView3Plus_vaetiling = gr.Checkbox(label="VAE Tiling", value=initial_state.get("vaetiling", True), interactive=True)
     with gr.Row():
         with gr.Column():
             cogView3Plus_prompt_input = gr.Textbox(
@@ -151,23 +153,24 @@ def create_cogView3Plus_tab():
             with gr.Row():
                 cogView3Plus_resolution_dropdown = gr.Dropdown(
                     choices=RESOLUTIONS_cogView3Plus,
-                    value="512x512",
+                    value=initial_state.get("resolution", "512x512"),
                     label="Resolution"
                 )
                 seed_input = gr.Number(label="Seed", value=0, minimum=0, maximum=MAX_SEED, interactive=True)
                 random_button = gr.Button("Randomize Seed")
+                save_state_button = gr.Button("Save State")
             with gr.Row():
                 cogView3Plus_guidance_scale_slider = gr.Slider(
                     label="Guidance Scale", 
                     minimum=1.0, 
                     maximum=20.0, 
-                    value=7.0, 
+                    value=initial_state.get("guidance_scale", 7.0),
                     step=0.1,
                     interactive=True
                 )
                 cogView3Plus_num_inference_steps_input = gr.Number(
                     label="Number of Inference Steps", 
-                    value=50,
+                    value=initial_state.get("inference_steps", 50),
                     interactive=True
                 )
     with gr.Row():
@@ -179,8 +182,33 @@ def create_cogView3Plus_tab():
         height="auto"
     )
 
+    def save_current_state(memory_optimization, vaeslicing, vaetiling, resolution, guidance_scale, inference_steps):
+        state_dict = {
+            "memory_optimization": memory_optimization,
+            "vaeslicing": vaeslicing,
+            "vaetiling": vaetiling,
+            "resolution": resolution,
+            "guidance_scale": guidance_scale,
+            "inference_steps": inference_steps
+        }
+        # print("Saving state:", state_dict)
+        initial_state = state_manager.get_state("cogview3plus") or {}
+        return state_manager.save_state("cogview3plus", state_dict)
+
     # Event handlers
     random_button.click(fn=random_seed, outputs=[seed_input])
+    save_state_button.click(
+        fn=save_current_state,
+        inputs=[
+            cogView3Plus_memory_optimization, 
+            cogView3Plus_vaeslicing, 
+            cogView3Plus_vaetiling, 
+            cogView3Plus_resolution_dropdown, 
+            cogView3Plus_guidance_scale_slider, 
+            cogView3Plus_num_inference_steps_input
+        ],
+        outputs=[gr.Textbox(visible=False)]
+    )
 
     generate_button.click(
         fn=generate_images,

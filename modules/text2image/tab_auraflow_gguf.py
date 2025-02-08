@@ -11,6 +11,7 @@ from datetime import datetime
 from diffusers import AuraFlowPipeline, AuraFlowTransformer2DModel
 from diffusers import GGUFQuantizationConfig
 from modules.util.utilities import clear_previous_model_memory
+from modules.util.appstate import state_manager
 
 MAX_SEED = np.iinfo(np.int32).max
 OUTPUT_DIR = "output/t2i/auraflow"
@@ -141,21 +142,22 @@ def generate_images(
         modules.util.appstate.global_inference_in_progress = False
 
 def create_auraflow_gguf_tab():
+    initial_state = state_manager.get_state("auraflow_gguf") or {}
     with gr.Row():
         with gr.Column():
             auraflow_memory_optimization = gr.Radio(
                 choices=["No optimization", "Low VRAM"],
                 label="Memory Optimization",
-                value="Low VRAM",
+                value=initial_state.get("memory_optimization", "Low VRAM"),
                 interactive=True
             )
         with gr.Column():
-            auraflow_vaeslicing = gr.Checkbox(label="VAE slicing", value=True, interactive=True)
-            auraflow_vaetiling = gr.Checkbox(label="VAE Tiling", value=True, interactive=True)
+            auraflow_vaeslicing = gr.Checkbox(label="VAE Slicing", value=initial_state.get("vaeslicing", True), interactive=True)
+            auraflow_vaetiling = gr.Checkbox(label="VAE Tiling", value=initial_state.get("vaetiling", True), interactive=True)
         with gr.Column():
             auraflow_gguf_dropdown = gr.Dropdown(
                 choices=gguf_list,
-                value="aura_flow_0.3-Q6_K.gguf - 5.7 GB",
+                value=initial_state.get("gguf", "aura_flow_0.3-Q6_K.gguf - 5.7 GB"),
                 label="Select GGUF"
             )
     with gr.Row():
@@ -174,28 +176,29 @@ def create_auraflow_gguf_tab():
             with gr.Row():
                 auraflow_width_input = gr.Number(
                     label="Width", 
-                    value=1024, 
+                    value=initial_state.get("width", 1024),
                     interactive=True
                 )
                 auraflow_height_input = gr.Number(
                     label="Height", 
-                    value=1024, 
+                    value=initial_state.get("height", 1024),
                     interactive=True
                 )
                 seed_input = gr.Number(label="Seed", value=0, minimum=0, maximum=MAX_SEED, interactive=True)
                 random_button = gr.Button("Randomize Seed")
+                save_state_button = gr.Button("Save State")
             with gr.Row():
                 auraflow_guidance_scale_slider = gr.Slider(
                     label="Guidance Scale", 
                     minimum=1.0, 
                     maximum=20.0, 
-                    value=3.5, 
+                    value=initial_state.get("guidance_scale", 3.5),
                     step=0.1,
                     interactive=True
                 )
                 auraflow_num_inference_steps_input = gr.Number(
                     label="Number of Inference Steps", 
-                    value=50,
+                    value=initial_state.get("inference_steps", 50),
                     interactive=True
                 )
     with gr.Row():
@@ -207,8 +210,37 @@ def create_auraflow_gguf_tab():
         height="auto"
     )
 
+    def save_current_state(memory_optimization, gguf, vaeslicing, vaetiling, width, height, guidance_scale, inference_steps):
+        state_dict = {
+            "memory_optimization": memory_optimization,
+            "gguf": gguf,
+            "vaeslicing": vaeslicing,
+            "vaetiling": vaetiling,
+            "width": int(width),
+            "height": int(height),
+            "guidance_scale": guidance_scale,
+            "inference_steps": inference_steps
+        }
+        # print("Saving state:", state_dict)
+        initial_state = state_manager.get_state("auraflow_gguf") or {}
+        return state_manager.save_state("auraflow_gguf", state_dict)
+
     # Event handlers
     random_button.click(fn=random_seed, outputs=[seed_input])
+    save_state_button.click(
+        fn=save_current_state,
+        inputs=[
+            auraflow_memory_optimization, 
+            auraflow_gguf_dropdown, 
+            auraflow_vaeslicing, 
+            auraflow_vaetiling, 
+            auraflow_width_input, 
+            auraflow_height_input, 
+            auraflow_guidance_scale_slider, 
+            auraflow_num_inference_steps_input
+        ],
+        outputs=[gr.Textbox(visible=False)]
+    )
 
     generate_button.click(
         fn=generate_images,

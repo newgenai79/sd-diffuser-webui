@@ -12,6 +12,7 @@ from diffusers.utils import export_to_video
 from diffusers import LTXImageToVideoPipeline
 from transformers import T5EncoderModel, T5Tokenizer
 from modules.util.utilities import clear_previous_model_memory
+from modules.util.appstate import state_manager
 
 MAX_SEED = np.iinfo(np.int32).max
 OUTPUT_DIR = "output/i2v/ltxvideo091"
@@ -108,70 +109,97 @@ def generate_video(
         modules.util.appstate.global_inference_in_progress = False
 
 def create_ltximage2video091_tab():
+    initial_state = state_manager.get_state("ltximage2video091") or {}
     with gr.Row():
-        ltxvideo091_memory_optimization = gr.Radio(
+        ltximage2video091_memory_optimization = gr.Radio(
             choices=["No optimization", "Low VRAM"],
             label="Memory Optimization",
-            value="Low VRAM",
+            value=initial_state.get("memory_optimization", "Low VRAM"),
             interactive=True
         )
     with gr.Row():
         with gr.Column():
-            ltxvideo091_input_image = gr.Image(label="Input Image", type="pil")
+            ltximage2video091_input_image = gr.Image(label="Input Image", type="pil")
         with gr.Column():
-            ltxvideo091_prompt_input = gr.Textbox(
+            ltximage2video091_prompt_input = gr.Textbox(
                 label="Prompt", 
                 lines=3,
                 interactive=True
             )
-            ltxvideo091_negative_prompt_input = gr.Textbox(
+            ltximage2video091_negative_prompt_input = gr.Textbox(
                 label="Negative Prompt",
                 lines=3,
                 interactive=True
             )
         with gr.Column():
             with gr.Row():
-                ltxvideo091_width_input = gr.Number(
+                ltximage2video091_width_input = gr.Number(
                     label="Width", 
-                    value=704, 
+                    value=initial_state.get("width", 704),
                     interactive=True
                 )
-                ltxvideo091_height_input = gr.Number(
+                ltximage2video091_height_input = gr.Number(
                     label="Height", 
-                    value=480, 
+                    value=initial_state.get("height", 480),
                     interactive=True
                 )
                 seed_input = gr.Number(label="Seed", value=0, minimum=0, maximum=MAX_SEED, interactive=True)
                 random_button = gr.Button("Randomize Seed")
+                save_state_button = gr.Button("Save State")
             with gr.Row():
-                ltxvideo091_fps_input = gr.Number(
+                ltximage2video091_fps_input = gr.Number(
                     label="FPS", 
-                    value=24,
+                    value=initial_state.get("fps", 24),
                     interactive=True
                 )
-                ltxvideo091_num_inference_steps_input = gr.Number(
+                ltximage2video091_num_inference_steps_input = gr.Number(
                     label="Number of Inference Steps", 
-                    value=50,
+                    value=initial_state.get("inference_steps", 50),
                     interactive=True
                 )
-                ltxvideo091_num_frames_input = gr.Number(
+                ltximage2video091_num_frames_input = gr.Number(
                     label="Number of frames", 
-                    value=61,
+                    value=initial_state.get("no_of_frames", 61),
                     interactive=True
                 )
     with gr.Row():
         generate_button = gr.Button("Generate video")
     output_video = gr.Video(label="Generated Video", show_label=True)
 
+    def save_current_state(memory_optimization, width, height, fps, inference_steps, no_of_frames):
+        state_dict = {
+            "memory_optimization": memory_optimization,
+            "width": int(width),
+            "height": int(height),
+            "fps": fps,
+            "inference_steps": inference_steps,
+            "no_of_frames": no_of_frames
+        }
+        # print("Saving state:", state_dict)
+        initial_state = state_manager.get_state("ltximage2video091") or {}
+        return state_manager.save_state("ltximage2video091", state_dict)
+
     # Event handlers
     random_button.click(fn=random_seed, outputs=[seed_input])
+    save_state_button.click(
+        fn=save_current_state,
+        inputs=[
+            ltximage2video091_memory_optimization, 
+            ltximage2video091_width_input, 
+            ltximage2video091_height_input, 
+            ltximage2video091_fps_input, 
+            ltximage2video091_num_inference_steps_input,
+            ltximage2video091_num_frames_input
+        ],
+        outputs=[gr.Textbox(visible=False)]
+    )
 
     generate_button.click(
         fn=generate_video,
         inputs=[
-            seed_input, ltxvideo091_input_image, ltxvideo091_prompt_input, ltxvideo091_negative_prompt_input, ltxvideo091_width_input, 
-            ltxvideo091_height_input, ltxvideo091_fps_input, ltxvideo091_num_inference_steps_input, 
-            ltxvideo091_num_frames_input, ltxvideo091_memory_optimization,
+            seed_input, ltximage2video091_input_image, ltximage2video091_prompt_input, ltximage2video091_negative_prompt_input, ltximage2video091_width_input, 
+            ltximage2video091_height_input, ltximage2video091_fps_input, ltximage2video091_num_inference_steps_input, 
+            ltximage2video091_num_frames_input, ltximage2video091_memory_optimization,
         ],
         outputs=[output_video]
     )
