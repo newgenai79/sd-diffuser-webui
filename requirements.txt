@@ -22,3 +22,4 @@ patch_conv
 https://huggingface.co/datasets/newgenai79/Windows_wheels/resolve/main/TRITON/triton-3.1.0-cp310-cp310-win_amd64.whl?download=true; platform_system == "Windows" and python_version == "3.10"
 https://huggingface.co/datasets/newgenai79/Windows_wheels/resolve/main/TRITON/triton-3.1.0-cp311-cp311-win_amd64.whl?download=true; platform_system == "Windows" and python_version == "3.11"
 https://huggingface.co/datasets/newgenai79/Windows_wheels/resolve/main/TRITON/triton-3.1.0-cp312-cp312-win_amd64.whl?download=true; platform_system == "Windows" and python_version == "3.12"
+piexif

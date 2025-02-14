@@ -8,38 +8,48 @@ import numpy as np
 import os
 import modules.util.appstate
 from datetime import datetime
-from diffusers import LuminaText2ImgPipeline
+from diffusers import CogView3PlusPipeline
 from modules.util.utilities import clear_previous_model_memory
 from modules.util.appstate import state_manager
 
 MAX_SEED = np.iinfo(np.int32).max
-OUTPUT_DIR = "output/t2i/Lumina"
+OUTPUT_DIR = "output/t2i/cogView3Plus"
+RESOLUTIONS_cogView3Plus = [
+    "512x512",
+    "720x480",
+    "1024x1024",
+    "1280x720",
+    "2048x2048"
+]
 
 def random_seed():
     return torch.randint(0, MAX_SEED, (1,)).item()
 
-def get_pipeline(memory_optimization, vaeslicing, vaetiling, inference_type):
-    print("----Lumina mode: ",memory_optimization, vaeslicing, vaetiling)
+def get_pipeline(memory_optimization, vaeslicing, vaetiling):
+    print("----cogView3Plus mode: ",memory_optimization)
     # If model is already loaded with same configuration, reuse it
     if (modules.util.appstate.global_pipe is not None and 
-        type(modules.util.appstate.global_pipe).__name__ == "LuminaText2ImgPipeline" and
-        modules.util.appstate.global_inference_type == inference_type and 
+        type(modules.util.appstate.global_pipe).__name__ == "CogView3PlusPipeline" and
         modules.util.appstate.global_memory_mode == memory_optimization):
-        print(">>>>Reusing Lumina pipe<<<<")
+        print(">>>>Reusing cogView3Plus pipe<<<<")
         return modules.util.appstate.global_pipe
     else:
         clear_previous_model_memory()
-        
-    modules.util.appstate.global_pipe = LuminaText2ImgPipeline.from_pretrained(
-        "Alpha-VLLM/Lumina-Next-SFT-diffusers",
+    
+    modules.util.appstate.global_pipe = CogView3PlusPipeline.from_pretrained(
+        "THUDM/CogView3-Plus-3B",
         torch_dtype=torch.bfloat16,
     )
+    modules.util.appstate.global_pipe.text_encoder = modules.util.appstate.global_pipe.text_encoder.to("cpu")
+    modules.util.appstate.global_pipe.vae = modules.util.appstate.global_pipe.vae.to("cuda")
+    modules.util.appstate.global_pipe.transformer = modules.util.appstate.global_pipe.transformer.to("cuda")
 
     if memory_optimization == "Low VRAM":
         modules.util.appstate.global_pipe.enable_model_cpu_offload()
+    elif memory_optimization == "Extremely Low VRAM":
+        modules.util.appstate.global_pipe.enable_sequential_cpu_offload()
     else:
         modules.util.appstate.global_pipe.to("cuda")
-
     if vaeslicing:
         modules.util.appstate.global_pipe.vae.enable_slicing()
     else:
@@ -51,22 +61,32 @@ def get_pipeline(memory_optimization, vaeslicing, vaetiling, inference_type):
         
     # Update global variables
     modules.util.appstate.global_memory_mode = memory_optimization
-    modules.util.appstate.global_inference_type = inference_type
     return modules.util.appstate.global_pipe
 
+def get_dimensions(resolution):
+    width, height = map(int, resolution.split('x'))
+    return width, height
 def generate_images(
-    seed, prompt, negative_prompt, width, height, guidance_scale,
+    seed, prompt, negative_prompt, resolution, guidance_scale,
     num_inference_steps, memory_optimization, vaeslicing, vaetiling, 
 ):
+
     if modules.util.appstate.global_inference_in_progress == True:
         print(">>>>Inference in progress, can't continue<<<<")
         return None
     modules.util.appstate.global_inference_in_progress = True
     try:
         # Get pipeline (either cached or newly loaded)
-        pipe = get_pipeline(memory_optimization, vaeslicing, vaetiling, "lumina1")
+        pipe = get_pipeline(memory_optimization, vaeslicing, vaetiling)
         generator = torch.Generator(device="cpu").manual_seed(seed)
+        width, height = get_dimensions(resolution)
         
+        progress_bar = gr.Progress(track_tqdm=True)
+
+        def callback_on_step_end(pipe, i, t, callback_kwargs):
+            progress_bar(i / num_inference_steps, desc=f"Generating image (Step {i}/{num_inference_steps})")
+            return callback_kwargs
+
         # Prepare inference parameters
         inference_params = {
             "prompt": prompt,
@@ -76,44 +96,28 @@ def generate_images(
             "guidance_scale": guidance_scale,
             "num_inference_steps": num_inference_steps,
             "generator": generator,
+            "callback_on_step_end": callback_on_step_end,
         }
 
         # Generate images
-        start_time = datetime.now()
         image = pipe(**inference_params).images[0]
-        end_time = datetime.now()
-        generation_time = (end_time - start_time).total_seconds()
+        
         # Create output directory if it doesn't exist
         os.makedirs(OUTPUT_DIR, exist_ok=True)
         
-        base_filename = "lumina.png"
+        base_filename = "cogView3Plus.png"
         
         gallery_items = []
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
         filename = f"{timestamp}_{base_filename}"
         output_path = os.path.join(OUTPUT_DIR, filename)
-        metadata = {
-            "model": "Lumina Next SFT-1.0",
-            "prompt": prompt,
-            "negative_prompt": negative_prompt,
-            "seed": seed,
-            "guidance_scale": guidance_scale,
-            "num_inference_steps": num_inference_steps,
-            "width": width,
-            "height": height,
-            "memory_optimization": memory_optimization,
-            "vae_slicing": vaeslicing,
-            "vae_tiling": vaetiling,
-            "timestamp": timestamp,
-            "generation_time": generation_time
-        }
+        
         # Save the image
         image.save(output_path)
-        modules.util.utilities.save_metadata_to_file(output_path, metadata)
         print(f"Image generated: {output_path}")
         modules.util.appstate.global_inference_in_progress = False
         # Add to gallery items
-        gallery_items.append((output_path, "Lumina"))
+        gallery_items.append((output_path, "cogView3Plus"))
         
         return gallery_items
     except Exception as e:
@@ -122,56 +126,51 @@ def generate_images(
     finally:
         modules.util.appstate.global_inference_in_progress = False
 
-def create_lumina_tab():
-    initial_state = state_manager.get_state("lumina") or {}
+def create_cogView3Plus_tab():
+    initial_state = state_manager.get_state("cogview3plus") or {}
     with gr.Row():
         with gr.Column():
-            lumina_memory_optimization = gr.Radio(
-                choices=["No optimization", "Low VRAM"],
+            cogView3Plus_memory_optimization = gr.Radio(
+                choices=["No optimization", "Low VRAM", "Extremely Low VRAM"],
                 label="Memory Optimization",
                 value=initial_state.get("memory_optimization", "Low VRAM"),
                 interactive=True
             )
         with gr.Column():
-            lumina_vaeslicing = gr.Checkbox(label="VAE Slicing", value=initial_state.get("vaeslicing", True), interactive=True)
-            lumina_vaetiling = gr.Checkbox(label="VAE Tiling", value=initial_state.get("vaetiling", True), interactive=True)
+            cogView3Plus_vaeslicing = gr.Checkbox(label="VAE Slicing", value=initial_state.get("vaeslicing", True), interactive=True)
+            cogView3Plus_vaetiling = gr.Checkbox(label="VAE Tiling", value=initial_state.get("vaetiling", True), interactive=True)
     with gr.Row():
         with gr.Column():
-            lumina_prompt_input = gr.Textbox(
+            cogView3Plus_prompt_input = gr.Textbox(
                 label="Prompt", 
                 lines=3,
                 interactive=True
             )
-            lumina_negative_prompt_input = gr.Textbox(
+            cogView3Plus_negative_prompt_input = gr.Textbox(
                 label="Negative Prompt",
                 lines=3,
                 interactive=True
             )
         with gr.Column():
             with gr.Row():
-                lumina_width_input = gr.Number(
-                    label="Width", 
-                    value=initial_state.get("width", 1024),
-                    interactive=True
-                )
-                lumina_height_input = gr.Number(
-                    label="Height", 
-                    value=initial_state.get("height", 1024),
-                    interactive=True
+                cogView3Plus_resolution_dropdown = gr.Dropdown(
+                    choices=RESOLUTIONS_cogView3Plus,
+                    value=initial_state.get("resolution", "512x512"),
+                    label="Resolution"
                 )
                 seed_input = gr.Number(label="Seed", value=0, minimum=0, maximum=MAX_SEED, interactive=True)
                 random_button = gr.Button("Randomize Seed")
                 save_state_button = gr.Button("Save State")
             with gr.Row():
-                lumina_guidance_scale_slider = gr.Slider(
+                cogView3Plus_guidance_scale_slider = gr.Slider(
                     label="Guidance Scale", 
                     minimum=1.0, 
                     maximum=20.0, 
-                    value=initial_state.get("guidance_scale", 4.0),
+                    value=initial_state.get("guidance_scale", 7.0),
                     step=0.1,
                     interactive=True
                 )
-                lumina_num_inference_steps_input = gr.Number(
+                cogView3Plus_num_inference_steps_input = gr.Number(
                     label="Number of Inference Steps", 
                     value=initial_state.get("inference_steps", 50),
                     interactive=True
@@ -185,51 +184,49 @@ def create_lumina_tab():
         height="auto"
     )
 
-    def save_current_state(memory_optimization, vaeslicing, vaetiling, width, height, guidance_scale, inference_steps):
+    def save_current_state(memory_optimization, vaeslicing, vaetiling, resolution, guidance_scale, inference_steps):
         state_dict = {
             "memory_optimization": memory_optimization,
             "vaeslicing": vaeslicing,
             "vaetiling": vaetiling,
-            "width": int(width),
-            "height": int(height),
+            "resolution": resolution,
             "guidance_scale": guidance_scale,
             "inference_steps": inference_steps
         }
         # print("Saving state:", state_dict)
-        initial_state = state_manager.get_state("lumina") or {}
-        state_manager.save_state("lumina", state_dict)
-        return memory_optimization, vaeslicing, vaetiling, width, height, guidance_scale, inference_steps
+        initial_state = state_manager.get_state("cogview3plus") or {}
+        state_manager.save_state("cogview3plus", state_dict)
+        return memory_optimization, vaeslicing, vaetiling, resolution, guidance_scale, inference_steps
 
     # Event handlers
     random_button.click(fn=random_seed, outputs=[seed_input])
     save_state_button.click(
         fn=save_current_state,
         inputs=[
-            lumina_memory_optimization, 
-            lumina_vaeslicing, 
-            lumina_vaetiling, 
-            lumina_width_input, 
-            lumina_height_input, 
-            lumina_guidance_scale_slider, 
-            lumina_num_inference_steps_input
+            cogView3Plus_memory_optimization, 
+            cogView3Plus_vaeslicing, 
+            cogView3Plus_vaetiling, 
+            cogView3Plus_resolution_dropdown, 
+            cogView3Plus_guidance_scale_slider, 
+            cogView3Plus_num_inference_steps_input
         ],
         outputs=[
-            lumina_memory_optimization, 
-            lumina_vaeslicing, 
-            lumina_vaetiling, 
-            lumina_width_input, 
-            lumina_height_input, 
-            lumina_guidance_scale_slider, 
-            lumina_num_inference_steps_input
+            cogView3Plus_memory_optimization, 
+            cogView3Plus_vaeslicing, 
+            cogView3Plus_vaetiling, 
+            cogView3Plus_resolution_dropdown, 
+            cogView3Plus_guidance_scale_slider, 
+            cogView3Plus_num_inference_steps_input
         ]
     )
 
     generate_button.click(
         fn=generate_images,
         inputs=[
-            seed_input, lumina_prompt_input, lumina_negative_prompt_input, lumina_width_input, 
-            lumina_height_input, lumina_guidance_scale_slider, lumina_num_inference_steps_input, 
-            lumina_memory_optimization, lumina_vaeslicing, lumina_vaetiling,
+            seed_input, cogView3Plus_prompt_input, cogView3Plus_negative_prompt_input, 
+            cogView3Plus_resolution_dropdown, cogView3Plus_guidance_scale_slider, 
+            cogView3Plus_num_inference_steps_input, cogView3Plus_memory_optimization, 
+            cogView3Plus_vaeslicing, cogView3Plus_vaetiling,
         ],
         outputs=[output_gallery]
     )
