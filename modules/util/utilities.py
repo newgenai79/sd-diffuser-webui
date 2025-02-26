@@ -1,4 +1,5 @@
 import torch
+import gc
 import modules.util.appstate
 from PIL import Image
 import json
@@ -9,7 +10,8 @@ from pathlib import Path
 def clear_previous_model_memory():
     if modules.util.appstate.global_pipe is not None:
         print(">>>>clear_previous_model_memory: Removing model from memory<<<<")
-        modules.util.appstate.global_pipe.remove_all_hooks()
+        if hasattr(modules.util.appstate.global_pipe, 'remove_all_hooks'):
+            modules.util.appstate.global_pipe.remove_all_hooks()
         del modules.util.appstate.global_pipe
         modules.util.appstate.global_pipe = None
         modules.util.appstate.global_memory_mode = None
@@ -19,6 +21,7 @@ def clear_previous_model_memory():
         modules.util.appstate.global_selected_gguf = None
         modules.util.appstate.global_textencoder = None
         modules.util.appstate.global_selected_lora = None
+        gc.collect()
         torch.cuda.empty_cache()
 
 

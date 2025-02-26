@@ -73,14 +73,18 @@ def generate_video(
     try:
         # Get pipeline (either cached or newly loaded)
         pipe = get_pipeline("wan21t2v", memory_optimization)
-
+        progress_bar = gr.Progress(track_tqdm=True)
         # Generate video
         video = pipe(
             prompt=prompt,
+            width=width,
+            height=height,
             negative_prompt=negative_prompt,
             num_inference_steps=num_inference_steps,
+            num_frames=num_frames,
             seed=seed, 
-            tiled=True
+            tiled=True,
+            progress_bar_cmd=lambda x: progress_bar.tqdm(x, desc="Processing")
         )
         
         # Create output directory if it doesn't exist
