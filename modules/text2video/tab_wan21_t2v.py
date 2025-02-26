@@ -134,12 +134,12 @@ def create_wan21_t2v_tab():
                 wan21_width_input = gr.Number(
                     label="Width", 
                     value=initial_state.get("width", 832),
-                    interactive=False
+                    interactive=True
                 )
                 wan21_height_input = gr.Number(
                     label="Height", 
                     value=initial_state.get("height", 480),
-                    interactive=False
+                    interactive=True
                 )
             with gr.Row():
                 seed_input = gr.Number(label="Seed", value=0, minimum=0, maximum=MAX_SEED, interactive=True)
