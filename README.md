@@ -54,22 +54,31 @@ git clone https://github.com/newgenai79/sd-diffuser-webui
 cd sd-diffuser-webui
 ```
 
-<b>Step 3: Create virtual environment</b>
+<b>Step 3a: Create virtual environment: using conda/miniconda</b>
+
 ```	
 conda create -n sddw python==3.10.11 -y
 ```
-
-<b>Step 4: Activate virtual environment</b>
+<b>Activate virtual environment</b>
 ```	
 conda activate sddw
 ```
 
-<b>Step 5: Install requirements</b>
+<b>Step 3b: Create virtual environment: using python</b>
+```	
+python -m venv venv
+```
+<b>Activate virtual environment</b>
+```	
+venv\scripts\activate
+```
+
+<b>Step 4: Install requirements</b>
 ```
 pip install -r requirements_windows.txt
 ```
 
-<b>Step 6: Launch gradio based WebUI</b>
+<b>Step 5: Launch gradio based WebUI</b>
 ```	
 python app.py
 ```
