@@ -8,7 +8,7 @@
 	<a href='https://github.com/THUDM/CogView3'><img src='https://img.shields.io/badge/CogView_3_Plus-red'></a>
 	<a href='https://huggingface.co/Alpha-VLLM/Lumina-Next-SFT-diffusers'><img src='https://img.shields.io/badge/Lumina_Next_SFT-blue'></a>
 	<a href='https://github.com/ai-forever/Kandinsky-3'><img src='https://img.shields.io/badge/Kandinsky3-red'></a>
-	<!--a href='https://huggingface.co/ostris/Flex.1-alpha'><img src='https://img.shields.io/badge/Flex.1_alpha-blue'></a-->
+	<a href='https://huggingface.co/fal/AuraFlow-v0.3'><img src='https://img.shields.io/badge/AuraFlow_0.3-blue'></a>
 </div>
 
 <h2 align='center'>Supported Text-2-Video models</h2>
