@@ -16,13 +16,12 @@
 	<a href='https://github.com/Wan-Video/Wan2.1'><img src='https://img.shields.io/badge/Wan_2.1-red'></a>
 </div>
 
-<!--h2 align='center'>Supported Image-2-Video models</h2>
+<h2 align='center'>Supported Image-2-Video models</h2>
 <div align='center'>
     <a href='https://github.com/Lightricks/LTX-Video'><img src='https://img.shields.io/badge/LTX_Video_0.9.1-blue'></a>
-	<a href='https://github.com/THUDM/CogVideo'><img src='https://img.shields.io/badge/CogVideoX_v1.5_5b-red'></a>
 </div>
 
-<h2 align='center'>Supported Video-2-Video models</h2>
+<!--h2 align='center'>Supported Video-2-Video models</h2>
 <div align='center'>
     <a href='https://github.com/THUDM/CogVideo'><img src='https://img.shields.io/badge/CogVideoX-blue'></a>
 	<a href='https://huggingface.co/alibaba-pai/CogVideoX-Fun-V1.1-5b-Pose'><img src='https://img.shields.io/badge/CogVideoX_Fun_Pose-red'></a>
@@ -39,7 +38,7 @@
 
 
 <h3 align='center'>To-Do List</h3>
-- [x] Text 2 image: Lumina-Image 2.0, Lumina Next SFT<br />
+- [ ] Text 2 image: Lumina-Image 2.0 with Lora<br />
 
 <hr />
 <h3 align='center'>Installation guide for Windows (Currently WIP)</h3>

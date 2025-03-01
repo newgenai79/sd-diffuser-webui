@@ -24,6 +24,13 @@ from modules.text2video.tab_skyreels_t2v import create_skyreels_t2v_tab
 from modules.text2video.tab_wan21_t2v import create_wan21_t2v_tab
 
 # Image 2 Video
+from modules.image2video.tab_ltximage2video091 import create_ltximage2video091_tab
+
+# Video 2 Video
+from modules.video2video.tab_wan21_v2v import create_wan21_v2v_tab
+
+# Extras
+from modules.extras.tab_video_upscale import create_video_upscaler_interface
 
 # Import utilities for metadata handling
 from modules.util.utilities import read_metadata_from_file
@@ -130,8 +137,20 @@ with gr.Blocks() as dwebui:
                     create_wan21_t2v_tab()           
                 with gr.Tab("SkyworkAI- SkyReels"):
                     create_skyreels_t2v_tab()
-
-        
+        with gr.Tab("Image 2 Video"):
+            with gr.Tabs():
+                with gr.Tab("LTX-Video 0.9.1"):
+                    create_ltximage2video091_tab()
+        """
+        with gr.Tab("Video 2 Video"):
+            with gr.Tabs():
+                with gr.Tab("Wan-Video - Wan2.1"):
+                    create_wan21_v2v_tab()
+        """
+        with gr.Tab("Extras"):
+            with gr.Tabs():
+                with gr.Tab("Video upscaler"):
+                    create_video_upscaler_interface()
         with gr.Tab("Info"):
             create_info_tab()
 

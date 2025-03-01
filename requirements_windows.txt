@@ -27,3 +27,7 @@ modelscope
 safetensors
 controlnet-aux
 cupy-cuda12x
+git+https://github.com/XPixelGroup/BasicSR.git
+realesrgan
+gfpgan
+ftfy

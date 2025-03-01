@@ -269,7 +269,6 @@ def launch_training_task(model, args):
         batch_size=args.batch_size,
         num_workers=args.dataloader_num_workers
     )
-
     # train
     trainer = pl.Trainer(
         max_epochs=args.max_epochs,
@@ -279,7 +278,7 @@ def launch_training_task(model, args):
         strategy=args.training_strategy,
         default_root_dir=args.output_path,
         accumulate_grad_batches=args.accumulate_grad_batches,
-        callbacks=[pl.pytorch.callbacks.ModelCheckpoint(save_top_k=-1)]
+        callbacks=[pl.pytorch.callbacks.ModelCheckpoint(save_top_k=-1)],
     )
     trainer.fit(model=model, train_dataloaders=train_loader)
 
