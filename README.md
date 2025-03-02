@@ -91,12 +91,20 @@ python app.py
 <h3 align='center'>Test environment</h3>
 <ul>
 	<li>Windows 11</li>
-	<li>Nvidia RTX 4060 8 GB Laptop GPU + 8 GB shared RAM + 45536 GB Virtual memory / paging file size</li>
+	<li>Nvidia RTX 4060 8 GB Laptop GPU + 8 GB shared RAM + 45 GB Virtual memory / paging file size</li>
 	<li><a href="https://www.python.org/downloads/release/python-31011/" target="_blank">Python 3.10.11</a></li>
 	<li><a href="https://docs.anaconda.com/miniconda/" target="_blank">Miniconda</a></li>
 	<li><a href="https://git-scm.com/" target="_blank">Git</a></li>
 	<li><a href="https://developer.nvidia.com/cuda-downloads" target="_blank">CUDA 12.6</a> (Cuda compilation tools, release 12.6, V12.6.77 - Build cuda_12.6.r12.6/compiler.34841621_0)</li>
 	<li><a href="https://visualstudio.microsoft.com/vs/community/" target="_blank">Microsoft (R) C/C++ Optimizing Compiler Version 19.29.30157 for x64</a></li>
+</ul>
+
+<ul>
+	<li>Linux Mint 22 Wilma</li>
+	<li>AMD Ryzen 5700 X3D + 2x Nvidia Geforce RTX 4070 12 GB + 32 GB DDR4 RAM</li>
+	<li>Python 3.10.11</li>
+	<li>Miniconda</li>
+	<li>Cuda V12.0.140 - Build cuda_12.0.r12.0/compiler.32267302_0</li>
 </ul>
 <hr />
 <div align='center'>
