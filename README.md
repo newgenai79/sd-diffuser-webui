@@ -100,7 +100,9 @@ python app.py
 <hr />
 <div align='center'>
 Credits: 
+<br />
 <a href='https://github.com/huggingface/diffusers' target='_blank'>Huggingface/Diffusers team</a>
+<br />
 <a href='https://github.com/modelscope/DiffSynth-Studio' target='_blank'>Diffsynth Studio team</a>
 <br />
 
