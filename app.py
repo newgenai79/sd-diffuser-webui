@@ -10,6 +10,7 @@ from pathlib import Path
 import json
 
 # Text 2 Image
+from modules.text2image.tab_wan21 import create_wan21_t2i_tab
 from modules.text2image.tab_lumina2 import create_lumina2_tab
 from modules.text2image.tab_sana import create_sana_tab
 from modules.text2image.tab_lumina import create_lumina_tab
@@ -27,7 +28,7 @@ from modules.text2video.tab_wan21_t2v import create_wan21_t2v_tab
 from modules.image2video.tab_ltximage2video091 import create_ltximage2video091_tab
 
 # Video 2 Video
-# from modules.video2video.tab_wan21_v2v import create_wan21_v2v_tab
+from modules.video2video.tab_wan21_v2v import create_wan21_v2v_tab
 
 # Extras
 from modules.extras.tab_video_upscale import create_video_upscaler_interface
@@ -115,6 +116,8 @@ with gr.Blocks() as dwebui:
                     create_lumina2_tab()
                 with gr.Tab("Sana"):
                     create_sana_tab()
+                with gr.Tab("Wan-Video-Wan2.1: 1.3B"):
+                    create_wan21_t2i_tab()
                 with gr.Tab("Lumina 1.0 Next SFT"):
                     create_lumina_tab()
                 with gr.Tab("Hunyuan DiT"):
@@ -133,7 +136,7 @@ with gr.Blocks() as dwebui:
         # Text 2 Video Tab
         with gr.Tab("Text 2 Video"):
             with gr.Tabs():
-                with gr.Tab("Wan-Video - Wan2.1"):
+                with gr.Tab("Wan-Video-Wan2.1: 1.3B"):
                     create_wan21_t2v_tab()           
                 with gr.Tab("SkyworkAI- SkyReels"):
                     create_skyreels_t2v_tab()
