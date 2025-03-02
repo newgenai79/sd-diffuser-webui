@@ -78,8 +78,14 @@ venv\scripts\activate
 ```
 
 <b>Step 4: Install requirements</b>
+Windows
 ```
 pip install -r requirements_windows.txt
+```
+<br />
+Linux
+```
+pip install -r requirements_linux.txt
 ```
 
 <b>Step 5: Launch gradio based WebUI</b>
