@@ -98,7 +98,7 @@ python app.py
 	<li><a href="https://developer.nvidia.com/cuda-downloads" target="_blank">CUDA 12.6</a> (Cuda compilation tools, release 12.6, V12.6.77 - Build cuda_12.6.r12.6/compiler.34841621_0)</li>
 	<li><a href="https://visualstudio.microsoft.com/vs/community/" target="_blank">Microsoft (R) C/C++ Optimizing Compiler Version 19.29.30157 for x64</a></li>
 </ul>
-
+<br />
 <ul>
 	<li>Linux Mint 22 Wilma</li>
 	<li>AMD Ryzen 5700 X3D + 2x Nvidia Geforce RTX 4070 12 GB + 32 GB DDR4 RAM</li>
