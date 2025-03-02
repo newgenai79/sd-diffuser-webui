@@ -103,5 +103,5 @@ Credits:
 <a href='https://github.com/huggingface/diffusers' target='_blank'>Huggingface/Diffusers team</a>
 <a href='https://github.com/modelscope/DiffSynth-Studio' target='_blank'>Diffsynth Studio team</a>
 <br />
-Note: We are not affliated with Diffusers team.
+
 </div>
