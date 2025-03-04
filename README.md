@@ -14,7 +14,7 @@
 
 <h2 align='center'>Supported Text-2-Video models</h2>
 <div align='center'>
-	<a href='https://github.com/Wan-Video/Wan2.1'><img src='https://img.shields.io/badge/Wan_2.1-red'></a>
+	<a href='https://github.com/Wan-Video/Wan2.1'><img src='https://img.shields.io/badge/Wan_2.1_1.3B-red'></a>
 </div>
 
 <h2 align='center'>Supported Image-2-Video models</h2>
