@@ -9,6 +9,7 @@
 	<a href='https://huggingface.co/Alpha-VLLM/Lumina-Next-SFT-diffusers'><img src='https://img.shields.io/badge/Lumina_Next_SFT-blue'></a>
 	<a href='https://github.com/ai-forever/Kandinsky-3'><img src='https://img.shields.io/badge/Kandinsky3-red'></a>
 	<a href='https://huggingface.co/fal/AuraFlow-v0.3'><img src='https://img.shields.io/badge/AuraFlow_0.3-blue'></a>
+	<a href='https://github.com/Wan-Video/Wan2.1'><img src='https://img.shields.io/badge/Wan_2.1_1.3B-red'></a>
 </div>
 
 <h2 align='center'>Supported Text-2-Video models</h2>
