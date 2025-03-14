@@ -10,7 +10,6 @@ from pathlib import Path
 import json
 
 # Text 2 Image
-from modules.text2image.tab_cogview4 import create_cogView4_tab
 from modules.text2image.tab_wan21 import create_wan21_t2i_tab
 from modules.text2image.tab_lumina2 import create_lumina2_tab
 from modules.text2image.tab_sana import create_sana_tab
@@ -121,8 +120,6 @@ with gr.Blocks() as dwebui:
         # Text 2 Image Tab
         with gr.Tab("Text 2 Image"):
             with gr.Tabs():
-                with gr.Tab("CogView 4"):
-                    create_cogView4_tab()
                 with gr.Tab("Lumina Image 2.0"):
                     create_lumina2_tab()
                 with gr.Tab("Sana"):
