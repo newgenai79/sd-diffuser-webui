@@ -113,7 +113,7 @@ python app.py
 <ul>
 	<li>Linux Mint 22 Wilma</li>
 	<li>AMD Ryzen 5700 X3D + Nvidia Geforce RTX 4070 12 GB + 32 GB DDR4 RAM</li>
-	<li>Python 3.10.11</li>
+	<li>Python 3.11.9</li>
 	<li>Miniconda</li>
 	<li>Cuda V12.0.140 - Build cuda_12.0.r12.0/compiler.32267302_0</li>
 </ul>
