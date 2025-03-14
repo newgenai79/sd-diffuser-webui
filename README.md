@@ -32,6 +32,12 @@
     <img src='https://img.shields.io/badge/Video_upscaler-blue'></a>
 	<img src='https://img.shields.io/badge/Image_generation_info-red'></a>
 </div>
+
+<h2 align='center'>SVDquant - Nunchaku</h2>
+<div align='center'>
+    <img src='https://img.shields.io/badge/Flux.1_dev-blue'></a>
+	<img src='https://img.shields.io/badge/Flux.1_schnell-red'></a>
+</div>
 <hr />
 
 <!--p align="center">
