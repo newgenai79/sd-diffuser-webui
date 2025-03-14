@@ -125,5 +125,6 @@ Credits:
 <br />
 <a href='https://github.com/modelscope/DiffSynth-Studio' target='_blank'>Diffsynth Studio team</a>
 <br />
-
+<a href='https://github.com/mit-han-lab/nunchaku' target='_blank'>SVDQuant</a>
+<br />
 </div>
