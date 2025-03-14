@@ -36,7 +36,7 @@ from modules.text2video.tab_wan21_t2v import create_wan21_t2v_tab
 from modules.image2video.tab_ltximage2video091 import create_ltximage2video091_tab
 
 # Video 2 Video
-from modules.video2video.tab_wan21_v2v import create_wan21_v2v_tab
+
 
 # Extras
 from modules.extras.tab_video_upscale import create_video_upscaler_interface
