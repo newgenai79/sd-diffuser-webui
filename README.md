@@ -37,6 +37,8 @@
 <div align='center'>
     <img src='https://img.shields.io/badge/Flux.1_dev-blue'></a>
 	<img src='https://img.shields.io/badge/Flux.1_schnell-red'></a>
+	<img src='https://img.shields.io/badge/Flux.1_dev_Canny-blue'></a>
+	<img src='https://img.shields.io/badge/Flux.1_dev_Depth-red'></a>
 </div>
 <hr />
 
