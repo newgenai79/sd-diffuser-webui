@@ -10,6 +10,7 @@ from pathlib import Path
 import json
 
 # Text 2 Image
+from modules.text2image.tab_cogview4 import create_cogView4_tab
 from modules.text2image.tab_wan21 import create_wan21_t2i_tab
 from modules.text2image.tab_lumina2 import create_lumina2_tab
 from modules.text2image.tab_sana import create_sana_tab
@@ -20,6 +21,14 @@ from modules.text2image.tab_cogview3plus import create_cogView3Plus_tab
 from modules.text2image.tab_auraflow import create_auraflow_tab
 from modules.text2image.tab_auraflow_gguf import create_auraflow_gguf_tab
 
+# SVDQuant
+from modules.svdquant.tab_flux_dev import create_flux_dev_tab
+from modules.svdquant.tab_flux_schnell import create_flux_schnell_tab
+from modules.svdquant.tab_flux_canny_dev import create_flux_canny_tab
+from modules.svdquant.tab_flux_depth_dev import create_flux_depth_tab
+from modules.svdquant.tab_flux_fill_dev import create_flux_fill_tab
+from modules.svdquant.tab_flux_redux_dev import create_flux_redux_tab
+
 # Text 2 Video
 from modules.text2video.tab_skyreels_t2v import create_skyreels_t2v_tab
 from modules.text2video.tab_wan21_t2v import create_wan21_t2v_tab
@@ -28,7 +37,7 @@ from modules.text2video.tab_wan21_t2v import create_wan21_t2v_tab
 from modules.image2video.tab_ltximage2video091 import create_ltximage2video091_tab
 
 # Video 2 Video
-# from modules.video2video.tab_wan21_v2v import create_wan21_v2v_tab
+from modules.video2video.tab_wan21_v2v import create_wan21_v2v_tab
 
 # Extras
 from modules.extras.tab_video_upscale import create_video_upscaler_interface
@@ -112,6 +121,8 @@ with gr.Blocks() as dwebui:
         # Text 2 Image Tab
         with gr.Tab("Text 2 Image"):
             with gr.Tabs():
+                with gr.Tab("CogView 4"):
+                    create_cogView4_tab()
                 with gr.Tab("Lumina Image 2.0"):
                     create_lumina2_tab()
                 with gr.Tab("Sana"):
@@ -133,6 +144,20 @@ with gr.Blocks() as dwebui:
             with gr.Tabs():
                 with gr.Tab("AuraFlow 0.3 - GGUF"):
                     create_auraflow_gguf_tab()
+        with gr.Tab("SVDQuant - nunchaku"):
+            with gr.Tabs():
+                with gr.Tab("Flux.1 Dev"):
+                    create_flux_dev_tab()
+                with gr.Tab("Flux.1 Dev - Canny"):
+                    create_flux_canny_tab()
+                with gr.Tab("Flux.1 Dev - Depth"):
+                    create_flux_depth_tab()
+                with gr.Tab("Flux.1 Dev - Fill"):
+                    create_flux_fill_tab()
+                with gr.Tab("Flux.1 Dev - Redux"):
+                    create_flux_redux_tab()
+                with gr.Tab("Flux.1 Schnell"):
+                    create_flux_schnell_tab()
         # Text 2 Video Tab
         with gr.Tab("Text 2 Video"):
             with gr.Tabs():
@@ -144,12 +169,6 @@ with gr.Blocks() as dwebui:
             with gr.Tabs():
                 with gr.Tab("LTX-Video 0.9.1"):
                     create_ltximage2video091_tab()
-        """
-        with gr.Tab("Video 2 Video"):
-            with gr.Tabs():
-                with gr.Tab("Wan-Video - Wan2.1"):
-                    create_wan21_v2v_tab()
-        """
         with gr.Tab("Extras"):
             with gr.Tabs():
                 with gr.Tab("Video upscaler"):

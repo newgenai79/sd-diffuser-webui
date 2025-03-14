@@ -1,5 +1,6 @@
 import torch
 import gc
+import time
 import modules.util.appstate
 from PIL import Image
 import json
@@ -10,20 +11,92 @@ from pathlib import Path
 def clear_previous_model_memory():
     if modules.util.appstate.global_pipe is not None:
         print(">>>>clear_previous_model_memory: Removing model from memory<<<<")
+        
+        # Remove hooks if present
         if hasattr(modules.util.appstate.global_pipe, 'remove_all_hooks'):
             modules.util.appstate.global_pipe.remove_all_hooks()
+        
+        # Explicitly delete model components
+        if hasattr(modules.util.appstate.global_pipe, '__dict__'):
+            for attr_name, attr_value in list(modules.util.appstate.global_pipe.__dict__.items()):
+                if hasattr(attr_value, 'to'):
+                    try:
+                        attr_value.to("cpu")  # Move to CPU to free VRAM
+                    except:
+                        pass
+                delattr(modules.util.appstate.global_pipe, attr_name)
+        
+        # Delete the pipeline
         del modules.util.appstate.global_pipe
-        modules.util.appstate.global_pipe = None
-        modules.util.appstate.global_memory_mode = None
-        modules.util.appstate.global_inference_type = None
-        modules.util.appstate.global_model_type = None
-        modules.util.appstate.global_quantization = None
-        modules.util.appstate.global_selected_gguf = None
-        modules.util.appstate.global_textencoder = None
-        modules.util.appstate.global_selected_lora = None
-        gc.collect()
-        torch.cuda.empty_cache()
+        
+    # Reset all global state variables
+    modules.util.appstate.global_pipe = None
+    modules.util.appstate.global_memory_mode = None
+    modules.util.appstate.global_inference_type = None
+    modules.util.appstate.global_model_type = None
+    modules.util.appstate.global_quantization = None
+    modules.util.appstate.global_selected_gguf = None
+    del modules.util.appstate.global_textencoder
+    modules.util.appstate.global_textencoder = None
+    modules.util.appstate.global_selected_lora = None
+    modules.util.appstate.global_bypass_token_limit = None
+    del modules.util.appstate.global_text_encoder_2
+    modules.util.appstate.global_text_encoder_2 = None
+    # Force garbage collection and CUDA memory cleanup
+    gc.collect()
+    torch.cuda.empty_cache()
+    torch.cuda.ipc_collect()  # Helps with shared memory issues
+    torch.cuda.synchronize()  # Ensure all operations are completed
+    
+    # Debugging memory usage
+    print("CUDA allocated:", torch.cuda.memory_allocated() / 1e6, "MB")
+    print("CUDA reserved:", torch.cuda.memory_reserved() / 1e6, "MB")
 
+def pad_tensors_to_equal_length(prompt_embeds, negative_prompt_embeds):
+    """Pad the shorter tensor to match the longer one's sequence length"""
+    prompt_shape = prompt_embeds.shape
+    negative_shape = negative_prompt_embeds.shape
+    
+    # If shapes are already equal, return as is
+    if prompt_shape[1] == negative_shape[1]:
+        return prompt_embeds, negative_prompt_embeds
+    
+    # Determine which one is shorter and pad it
+    if prompt_shape[1] < negative_shape[1]:
+        # Pad prompt_embeds
+        padding_length = negative_shape[1] - prompt_shape[1]
+        # Create padding that matches the embedding dimensions
+        padding = torch.zeros((prompt_shape[0], padding_length, prompt_shape[2]), 
+                              dtype=prompt_embeds.dtype,
+                              device=prompt_embeds.device)
+        # Concatenate along sequence dimension
+        padded_prompt_embeds = torch.cat([prompt_embeds, padding], dim=1)
+        return padded_prompt_embeds, negative_prompt_embeds
+    else:
+        # Pad negative_prompt_embeds
+        padding_length = prompt_shape[1] - negative_shape[1]
+        padding = torch.zeros((negative_shape[0], padding_length, negative_shape[2]),
+                             dtype=negative_prompt_embeds.dtype,
+                             device=negative_prompt_embeds.device)
+        padded_negative_embeds = torch.cat([negative_prompt_embeds, padding], dim=1)
+        return prompt_embeds, padded_negative_embeds
+
+def clear_text_model_memory(_pipe):
+    if hasattr(_pipe, 'remove_all_hooks'):
+        _pipe.remove_all_hooks()
+    # Explicitly delete model components
+    if hasattr(_pipe, '__dict__'):
+        for attr_name, attr_value in list(_pipe.__dict__.items()):
+            if hasattr(attr_value, 'to'):
+                try:
+                    attr_value.to("cpu")
+                except:
+                    pass
+            delattr(_pipe, attr_name)
+    del _pipe
+    gc.collect()
+    torch.cuda.empty_cache()
+    torch.cuda.synchronize()
 
 def save_metadata_to_file(file_path, metadata):
     """Save metadata to image or video file."""
@@ -42,8 +115,18 @@ def save_image_metadata(image_path, metadata):
     try:
         image = Image.open(image_path)
         
-        # Convert metadata dict to string
-        metadata_str = piexif.helper.UserComment.dump(json.dumps(metadata))
+        # Ensure numeric values maintain their precision during serialization
+        # By using a custom JSON encoder class
+        class PrecisionEncoder(json.JSONEncoder):
+            def default(self, obj):
+                if isinstance(obj, float):
+                    # Format float with enough decimal places to preserve precision
+                    # This prevents 3.5 from becoming 3
+                    return float(f"{obj:.2f}")
+                return json.JSONEncoder.default(self, obj)
+        
+        # Convert metadata dict to string with custom encoder
+        metadata_str = piexif.helper.UserComment.dump(json.dumps(metadata, cls=PrecisionEncoder))
         
         # Create Exif dict
         exif_dict = {"Exif": {piexif.ExifIFD.UserComment: metadata_str}}
@@ -53,6 +136,9 @@ def save_image_metadata(image_path, metadata):
         
         # Save image with metadata
         image.save(image_path, exif=exif_bytes)
+        
+        # Verify metadata was saved correctly by reading it back
+        print(f"Saved metadata with guidance_scale: {metadata.get('guidance_scale')}")
         return True
     except Exception as e:
         print(f"Error saving image metadata: {str(e)}")

@@ -332,7 +332,7 @@ def create_sana_tab():
                 )
                 sana_height_input = gr.Number(
                     label="Height", 
-                    value=initial_state.get("width", 2048),
+                    value=initial_state.get("height", 2048),
                     minimum=512, 
                     maximum=4096, 
                     step=64,
