@@ -23,6 +23,7 @@ from modules.text2image.tab_auraflow_gguf import create_auraflow_gguf_tab
 # SVDQuant
 from modules.svdquant.tab_flux_dev import create_flux_dev_tab
 from modules.svdquant.tab_flux_schnell import create_flux_schnell_tab
+from modules.svdquant.tab_flux_shuttle_jaguar import create_shuttle_jaguar_tab
 from modules.svdquant.tab_flux_canny_dev import create_flux_canny_tab
 from modules.svdquant.tab_flux_depth_dev import create_flux_depth_tab
 from modules.svdquant.tab_flux_fill_dev import create_flux_fill_tab
@@ -34,9 +35,6 @@ from modules.text2video.tab_wan21_t2v import create_wan21_t2v_tab
 
 # Image 2 Video
 from modules.image2video.tab_ltximage2video091 import create_ltximage2video091_tab
-
-# Video 2 Video
-
 
 # Extras
 from modules.extras.tab_video_upscale import create_video_upscaler_interface
@@ -155,6 +153,8 @@ with gr.Blocks() as dwebui:
                     create_flux_redux_tab()
                 with gr.Tab("Flux.1 Schnell"):
                     create_flux_schnell_tab()
+                with gr.Tab("Shuttle jaguar"):
+                    create_shuttle_jaguar_tab()
         # Text 2 Video Tab
         with gr.Tab("Text 2 Video"):
             with gr.Tabs():
