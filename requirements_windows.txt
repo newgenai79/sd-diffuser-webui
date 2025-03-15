@@ -31,3 +31,4 @@ git+https://github.com/XPixelGroup/BasicSR.git
 realesrgan
 gfpgan
 ftfy
+mediapipe
