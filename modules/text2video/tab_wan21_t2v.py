@@ -64,7 +64,7 @@ def get_pipeline(inference_type, memory_optimization):
 
 def generate_video(
     seed, prompt, negative_prompt, width, height, fps, num_inference_steps, 
-    num_frames, memory_optimization, quality
+    num_frames, memory_optimization, quality, tea_cache_l1_thresh
 ):
     if modules.util.appstate.global_inference_in_progress == True:
         print(">>>>Inference in progress, can't continue<<<<")
@@ -74,23 +74,27 @@ def generate_video(
         # Get pipeline (either cached or newly loaded)
         pipe = get_pipeline("wan21t2v", memory_optimization)
         progress_bar = gr.Progress(track_tqdm=True)
+        inference_params = {
+            "prompt": prompt,
+            "negative_prompt": negative_prompt,
+            "height": height,
+            "width": width,
+            "num_inference_steps": num_inference_steps,
+            "num_frames": num_frames,
+            "seed": seed,
+            "tiled": True,
+            "progress_bar_cmd": lambda x: progress_bar.tqdm(x, desc="Processing")
+        }
+        if(tea_cache_l1_thresh > 0):
+            inference_params["tea_cache_l1_thresh"] = tea_cache_l1_thresh
+            inference_params["tea_cache_model_id"]="Wan2.1-T2V-1.3B"
         # Generate video
-        video = pipe(
-            prompt=prompt,
-            width=width,
-            height=height,
-            negative_prompt=negative_prompt,
-            num_inference_steps=num_inference_steps,
-            num_frames=num_frames,
-            seed=seed, 
-            tiled=True,
-            progress_bar_cmd=lambda x: progress_bar.tqdm(x, desc="Processing")
-        )
+        video = pipe(**inference_params)
         
         # Create output directory if it doesn't exist
         os.makedirs(OUTPUT_DIR, exist_ok=True)
         
-        base_filename = "wan21.mp4"
+        base_filename = "wan211.3B.mp4"
         
         gallery_items = []
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
@@ -149,24 +153,30 @@ def create_wan21_t2v_tab():
                 seed_input = gr.Number(label="Seed", value=0, minimum=0, maximum=MAX_SEED, interactive=True)
                 random_button = gr.Button("Randomize Seed")
             with gr.Row():
-                with gr.Column():
-                    wan21_fps_input = gr.Number(
-                        label="FPS", 
-                        value=initial_state.get("fps", 15),
-                        interactive=True
-                    )
-                with gr.Column():
-                    wan21_num_inference_steps_input = gr.Number(
-                        label="Number of Inference Steps", 
-                        value=initial_state.get("inference_steps", 50),
-                        interactive=True
-                    )
-                with gr.Column():
-                    wan21_num_frames_input = gr.Number(
-                        label="Number of frames", 
-                        value=initial_state.get("no_of_frames", 81),
-                        interactive=True
-                    )
+                wan21_fps_input = gr.Number(
+                    label="FPS", 
+                    value=initial_state.get("fps", 16),
+                    interactive=True
+                )
+                wan21_num_inference_steps_input = gr.Number(
+                    label="Number of Inference Steps", 
+                    value=initial_state.get("inference_steps", 50),
+                    interactive=True
+                )
+                wan21_num_frames_input = gr.Number(
+                    label="Number of frames", 
+                    value=initial_state.get("no_of_frames", 81),
+                    interactive=True
+                )
+            with gr.Row():
+                wan21_tea_cache_l1_thresh_slider = gr.Slider(
+                    label="Tea cache (larger value - faster inference but low quality) (Set the value to 0 to disable)", 
+                    minimum=0, 
+                    maximum=1, 
+                    value=initial_state.get("quality", 0.05),
+                    step=0.01,
+                    interactive=True
+                )
             with gr.Row():
                 wan21_quality_slider = gr.Slider(
                     label="Video quality", 
@@ -224,7 +234,8 @@ def create_wan21_t2v_tab():
         inputs=[
             seed_input, wan21_prompt_input, wan21_negative_prompt_input, wan21_width_input, 
             wan21_height_input, wan21_fps_input, wan21_num_inference_steps_input, 
-            wan21_num_frames_input, wan21_memory_optimization, wan21_quality_slider
+            wan21_num_frames_input, wan21_memory_optimization, wan21_quality_slider,
+            wan21_tea_cache_l1_thresh_slider
         ],
         outputs=[output_video]
     )
