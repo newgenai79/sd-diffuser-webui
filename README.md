@@ -35,12 +35,13 @@
 
 <h2 align='center'>SVDquant - Nunchaku</h2>
 <div align='center'>
-    <img src='https://img.shields.io/badge/Flux.1_dev-blue'></a>
-	<img src='https://img.shields.io/badge/Flux.1_schnell-red'></a>
-	<img src='https://img.shields.io/badge/Flux.1_dev_Canny-blue'></a>
-	<img src='https://img.shields.io/badge/Flux.1_dev_Depth-red'></a>
-	<img src='https://img.shields.io/badge/Flux.1_dev_Fill-blue'></a>
-	<img src='https://img.shields.io/badge/Flux.1_dev_Redux-red'></a>
+    <img src='https://img.shields.io/badge/Flux.1_dev-blue'>
+	<img src='https://img.shields.io/badge/Flux.1_schnell-red'>
+	<img src='https://img.shields.io/badge/Flux.1_dev_Canny-blue'>
+	<img src='https://img.shields.io/badge/Flux.1_dev_Depth-red'>
+	<img src='https://img.shields.io/badge/Flux.1_dev_Fill-blue'>
+	<img src='https://img.shields.io/badge/Flux.1_dev_Redux-red'>
+	<a href='https://huggingface.co/shuttleai/shuttle-jaguar'><img src='https://img.shields.io/badge/Shuttle_jaguar-blue'></a>
 </div>
 <hr />
 
