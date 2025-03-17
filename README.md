@@ -29,7 +29,7 @@
 </div-->
 <h2 align='center'>Additional</h2>
 <div align='center'>
-    <img src='https://img.shields.io/badge/Video_upscaler-blue'></a>
+    <img src='https://img.shields.io/badge/Video_interpolation+upscaler-blue'></a>
 	<img src='https://img.shields.io/badge/Image_generation_info-red'></a>
 </div>
 
