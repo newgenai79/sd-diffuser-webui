@@ -8,7 +8,7 @@ import numpy as np
 import os
 import modules.util.appstate
 from datetime import datetime
-from diffusers import SanaPipeline
+from diffusers import SanaPipeline, SanaSprintPipeline
 from modules.util.utilities import clear_previous_model_memory
 from modules.util.appstate import state_manager
 
@@ -78,13 +78,14 @@ def random_seed():
 def get_pipeline(inference_type, memory_optimization, vaeslicing, vaetiling):
     print("----Sana mode: ",inference_type, memory_optimization, vaeslicing, vaetiling)
     if (modules.util.appstate.global_pipe is not None and 
-        type(modules.util.appstate.global_pipe).__name__ == "SanaPipeline" and
+        (type(modules.util.appstate.global_pipe).__name__ == "SanaPipeline" or type(modules.util.appstate.global_pipe).__name__ == "SanaSprintPipeline") and
         modules.util.appstate.global_inference_type == inference_type and 
         modules.util.appstate.global_memory_mode == memory_optimization):
         print(">>>>Reusing Sana pipe<<<<")
         return modules.util.appstate.global_pipe
     else:
         clear_previous_model_memory()
+        torch.cuda.synchronize()
     
     # Determine model path based on inference type
     if inference_type == "Sana_1600M_512px_MultiLing":
@@ -107,7 +108,18 @@ def get_pipeline(inference_type, memory_optimization, vaeslicing, vaetiling):
         model_path = "Efficient-Large-Model/Sana_1600M_1024px_BF16_diffusers"
         dtype = torch.bfloat16
         variant="bf16"
-
+    elif inference_type == "Sana Sprint 1.6B":
+        model_path = "Efficient-Large-Model/Sana_Sprint_1.6B_1024px_diffusers"
+        dtype = torch.bfloat16
+        variant=None
+    elif inference_type == "Sana v1.5 1.6B 1K":
+        model_path = "Efficient-Large-Model/SANA1.5_1.6B_1024px_diffusers"
+        dtype = torch.bfloat16
+        variant=None
+    elif inference_type == "Sana v1.5 4.8B 1K":
+        model_path = "Efficient-Large-Model/SANA1.5_4.8B_1024px_diffusers"
+        dtype = torch.bfloat16
+        variant=None
     # Initialize pipeline
     if inference_type == "Twig-v0-alpha":
         from diffusers import SanaTransformer2DModel
@@ -128,6 +140,12 @@ def get_pipeline(inference_type, memory_optimization, vaeslicing, vaetiling):
                 torch_dtype=dtype,
                 use_safetensors=True,
             )
+        elif inference_type == "Sana Sprint 1.6B":
+            modules.util.appstate.global_pipe = SanaSprintPipeline.from_pretrained(
+                pretrained_model_name_or_path=model_path,
+                torch_dtype=dtype,
+                use_safetensors=True,
+            )
         else:
             modules.util.appstate.global_pipe = SanaPipeline.from_pretrained(
                 pretrained_model_name_or_path=model_path,
@@ -135,9 +153,6 @@ def get_pipeline(inference_type, memory_optimization, vaeslicing, vaetiling):
                 torch_dtype=dtype,
                 use_safetensors=True,
             )
-    # modules.util.appstate.global_pipe.to("cuda")
-    # modules.util.appstate.global_pipe.vae.to(torch.bfloat16)
-    # modules.util.appstate.global_pipe.text_encoder.to(torch.bfloat16)
     
     if memory_optimization == "Low VRAM":
         modules.util.appstate.global_pipe.enable_model_cpu_offload()
@@ -168,7 +183,7 @@ def get_pipeline(inference_type, memory_optimization, vaeslicing, vaetiling):
 def generate_images(
     seed, prompt, negative_prompt, width, height, guidance_scale,
     num_inference_steps, memory_optimization, inference_type, 
-    vaeslicing, vaetiling, sana_dropdown
+    vaeslicing, vaetiling, sana_dropdown, no_of_images, randomize_seed
 ):
 
     if modules.util.appstate.global_inference_in_progress == True:
@@ -186,34 +201,13 @@ def generate_images(
 
         # Get pipeline (either cached or newly loaded)
         pipe = get_pipeline(inference_type, memory_optimization, vaeslicing, vaetiling)
-        generator = torch.Generator(device="cpu").manual_seed(seed)
+        # generator = torch.Generator(device="cpu").manual_seed(seed)
         
         progress_bar = gr.Progress(track_tqdm=True)
 
         def callback_on_step_end(pipe, i, t, callback_kwargs):
             progress_bar(i / num_inference_steps, desc=f"Generating image (Step {i}/{num_inference_steps})")
             return callback_kwargs
-
-        # Prepare inference parameters
-        inference_params = {
-            "prompt": prompt,
-            "negative_prompt": negative_prompt,
-            "height": height,
-            "width": width,
-            "guidance_scale": guidance_scale,
-            "num_inference_steps": num_inference_steps,
-            "generator": generator,
-            "callback_on_step_end": callback_on_step_end,
-        }
-        
-        # Generate images
-        start_time = datetime.now()
-        images = pipe(**inference_params).images
-        end_time = datetime.now()
-        generation_time = (end_time - start_time).total_seconds()
-        # Create output directory if it doesn't exist
-        os.makedirs(OUTPUT_DIR, exist_ok=True)
-        
         # Get base filename based on inference type
         if inference_type == "Sana_1600M_512px_MultiLing":
             base_filename = "sana_512.png"
@@ -225,19 +219,46 @@ def generate_images(
             base_filename = "sana_4K.png"
         elif inference_type == "Twig-v0-alpha":
             base_filename = "sana_Twig-v0-alpha.png"
-        
-        # Save each image with unique timestamp and collect paths for gallery
+        elif inference_type == "Sana Sprint 1.6B":
+            base_filename = "sana_sprint.png"
+        elif inference_type == "Sana v1.5 1.6B 1K":
+            base_filename = "sana_v1.5_1.6B_1K.png"            
+        elif inference_type == "Sana v1.5 4.8B 1K":
+            base_filename = "sana_v1.5_4.8B_1K.png"
+        # Create output directory if it doesn't exist
+        os.makedirs(OUTPUT_DIR, exist_ok=True)
         gallery_items = []
-        for idx, image in enumerate(images):
+        for img_idx in range(no_of_images):
+            current_seed = random_seed() if randomize_seed else seed
+            generator = torch.Generator(device="cpu").manual_seed(current_seed)
+            inference_params = {
+                "prompt": prompt,
+                "height": height,
+                "width": width,
+                "guidance_scale": guidance_scale,
+                "num_inference_steps": num_inference_steps,
+                "generator": generator,
+                "callback_on_step_end": callback_on_step_end,
+            }
+            if inference_type == "Sana Sprint 1.6B":
+                if num_inference_steps != 2:
+                    inference_params["intermediate_timesteps"] = None
+            else:
+                inference_params["negative_prompt"] = negative_prompt
+            # Generate images
+            start_time = datetime.now()
+            image = pipe(**inference_params).images[0]
+            end_time = datetime.now()
+            generation_time = (end_time - start_time).total_seconds()
+
             # Generate unique timestamp for each image
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-            filename = f"{timestamp}_{idx+1}_{base_filename}"
+            filename = f"{timestamp}_{img_idx+1}_{base_filename}"
             output_path = os.path.join(OUTPUT_DIR, filename)
             metadata = {
                 "inference_type": inference_type,
                 "style": sana_dropdown,
                 "prompt": prompt,
-                "negative_prompt": negative_prompt,
                 "seed": seed,
                 "guidance_scale": guidance_scale,
                 "num_inference_steps": num_inference_steps,
@@ -249,10 +270,12 @@ def generate_images(
                 "timestamp": timestamp,
                 "generation_time": generation_time
             }
+            if not inference_type == "Sana Sprint 1.6B":
+                metadata["negative_prompt"] = negative_prompt
             # Save the image
             image.save(output_path)
             modules.util.utilities.save_metadata_to_file(output_path, metadata)
-            print(f"Image {idx+1} generated: {output_path}")
+            print(f"Image {img_idx+1}/{no_of_images} generated: {output_path}")
             
             # Add to gallery items
             gallery_items.append((output_path, f"{inference_type}"))
@@ -278,9 +301,9 @@ def create_sana_tab():
     initial_state = state_manager.get_state("sana") or {}
     with gr.Row():
         sana_inference_type = gr.Radio(
-            choices=["Sana 1K", "Sana 2K", "Sana 4K"], # "Sana_1600M_512px_MultiLing", "Sana_1600M_1024px_MultiLing",  "Twig-v0-alpha"
+            choices=["Sana Sprint 1.6B", "Sana v1.5 1.6B 1K", "Sana v1.5 4.8B 1K", "Sana 1K", "Sana 2K", "Sana 4K"], # "Sana_1600M_512px_MultiLing", "Sana_1600M_1024px_MultiLing",  "Twig-v0-alpha"
             label="Inference type",
-            value=initial_state.get("inference_type", "Sana 2K"),
+            value=initial_state.get("inference_type", "Sana Sprint 1.6B"),
             interactive=True
         )
     with gr.Row():
@@ -308,7 +331,7 @@ def create_sana_tab():
                     label="Negative Prompt",
                     placeholder="",
                     lines=3,
-                    interactive=True
+                    interactive=False
                 )
             with gr.Row():
                 sana_style_dropdown = gr.Dropdown(
@@ -324,7 +347,7 @@ def create_sana_tab():
             with gr.Row():
                 sana_width_input = gr.Number(
                     label="Width", 
-                    value=initial_state.get("width", 2048),
+                    value=initial_state.get("width", 1024),
                     minimum=512, 
                     maximum=4096, 
                     step=64,
@@ -332,7 +355,7 @@ def create_sana_tab():
                 )
                 sana_height_input = gr.Number(
                     label="Height", 
-                    value=initial_state.get("height", 2048),
+                    value=initial_state.get("height", 1024),
                     minimum=512, 
                     maximum=4096, 
                     step=64,
@@ -351,13 +374,20 @@ def create_sana_tab():
                 )
                 sana_num_inference_steps_input = gr.Number(
                     label="Number of Inference Steps", 
-                    value=initial_state.get("inference_steps", 30),
+                    value=initial_state.get("inference_steps", 2),
                     interactive=True
                 )
             with gr.Row():
-                save_state_button = gr.Button("Save State")
+                sana_no_of_images_input = gr.Number(
+                    label="Number of Images", 
+                    value=1,
+                    interactive=True
+                )
+                sana_randomize_seed = gr.Checkbox(label="Randomize seed", value=False, interactive=True)
+
     with gr.Row():
         generate_button = gr.Button("Generate image(s)")
+        save_state_button = gr.Button("Save State")
     output_gallery = gr.Gallery(
         label="Generated Images",
         columns=3,
@@ -366,23 +396,27 @@ def create_sana_tab():
     )
 
     def update_dimensions(selected_type):
-        if selected_type == "Sana_1600M_512px_MultiLing":
-            return (512, 512)
-        elif selected_type == "Sana 1K":
-            return (1024, 1024)
+        if selected_type == "Sana 1K":
+            return (1024, 1024, 20, gr.update(interactive=True))
         elif selected_type == "Sana 2K":
-            return (2048, 2048)
+            return (2048, 2048, 20, gr.update(interactive=True))
         elif selected_type == "Sana 4K":
-            return (4096, 4096)
-        elif selected_type == "Twig-v0-alpha":
-            return (1024, 1024)
+            return (4096, 4096, 20, gr.update(interactive=True))
+        elif selected_type == "Sana Sprint 1.6B":
+            return (1024, 1024, 2, gr.update(interactive=False))
+        else:
+            return (1024, 1024, 20, gr.update(interactive=True))
 
     sana_style_dropdown.change(
         fn=update_style_prompts,
         inputs=[sana_style_dropdown],
         outputs=[sana_prompt_style_template_input, sana_negative_prompt_input]
     )
-    sana_inference_type.change(update_dimensions, [sana_inference_type], [sana_width_input, sana_height_input])
+    sana_inference_type.change(
+        fn=update_dimensions,
+        inputs=[sana_inference_type],
+        outputs=[sana_width_input, sana_height_input, sana_num_inference_steps_input, sana_negative_prompt_input]
+    )
 
     def save_current_state(inference_type, memory_optimization, vaeslicing, vaetiling, width, height, guidance_scale, inference_steps):
         state_dict = {
@@ -432,7 +466,7 @@ def create_sana_tab():
             seed_input, sana_prompt_input, sana_negative_prompt_input, sana_width_input, 
             sana_height_input, sana_guidance_scale_slider, sana_num_inference_steps_input, 
             sana_memory_optimization, sana_inference_type, sana_vaeslicing, sana_vaetiling, 
-            sana_style_dropdown,
+            sana_style_dropdown, sana_no_of_images_input, sana_randomize_seed
         ],
         outputs=[output_gallery]
     )
