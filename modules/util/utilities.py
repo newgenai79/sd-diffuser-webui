@@ -137,8 +137,6 @@ def save_image_metadata(image_path, metadata):
         # Save image with metadata
         image.save(image_path, exif=exif_bytes)
         
-        # Verify metadata was saved correctly by reading it back
-        print(f"Saved metadata with guidance_scale: {metadata.get('guidance_scale')}")
         return True
     except Exception as e:
         print(f"Error saving image metadata: {str(e)}")
