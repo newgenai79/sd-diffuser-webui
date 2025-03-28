@@ -19,6 +19,8 @@ from modules.text2image.tab_kandinsky3 import create_kandinsky3_tab
 from modules.text2image.tab_cogview3plus import create_cogView3Plus_tab
 from modules.text2image.tab_auraflow import create_auraflow_tab
 from modules.text2image.tab_auraflow_gguf import create_auraflow_gguf_tab
+from modules.text2image.tab_sd35_large_swd_gguf import create_sd35_large_swd_gguf_tab
+from modules.text2image.tab_sd35_medium_swd_gguf import create_sd35_medium_swd_gguf_tab
 
 # SVDQuant
 from modules.svdquant.tab_flux_dev import create_flux_dev_tab
@@ -137,6 +139,10 @@ with gr.Blocks() as dwebui:
 
         with gr.Tab("Text 2 Image - quantized"):
             with gr.Tabs():
+                with gr.Tab("SD3.5 Large SWD - GGUF"):
+                    create_sd35_large_swd_gguf_tab()
+                with gr.Tab("SD3.5 Medium SWD - GGUF"):
+                    create_sd35_medium_swd_gguf_tab()
                 with gr.Tab("AuraFlow 0.3 - GGUF"):
                     create_auraflow_gguf_tab()
         with gr.Tab("SVDQuant - nunchaku"):
