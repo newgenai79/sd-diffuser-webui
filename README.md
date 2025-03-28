@@ -11,7 +11,7 @@
 	<a href='https://huggingface.co/fal/AuraFlow-v0.3'><img src='https://img.shields.io/badge/AuraFlow_0.3-blue'></a>
 	<a href='https://github.com/Wan-Video/Wan2.1'><img src='https://img.shields.io/badge/Wan_2.1_1.3B-red'></a>
 	<a href='https://github.com/Tencent/HunyuanDiT'><img src='https://img.shields.io/badge/HunyuanDIT-blue'></a>
-	<a href='https://github.com/yandex-research/swd'><img src='https://img.shields.io/badge/SWD-SD3.5_Medium-Large-red'></a>
+	<a href='https://github.com/yandex-research/swd'><img src='https://img.shields.io/badge/SWD_SD3.5_Medium_Large-red'></a>
 </div>
 
 <h2 align='center'>Supported Text-2-Video models</h2>
