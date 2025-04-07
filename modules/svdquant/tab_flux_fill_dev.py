@@ -21,11 +21,12 @@ OUTPUT_DIR = "output/t2i/Flux"
 def random_seed():
     return torch.randint(0, MAX_SEED, (1,)).item()
 
-def get_pipeline(memory_optimization):
-    print("----FluxFillPipeline mode: ", memory_optimization)
+def get_pipeline(memory_optimization, performance_optimization):
+    print("----FluxFillPipeline mode: ", memory_optimization, performance_optimization)
     # If model is already loaded with same configuration, reuse it
     if (modules.util.appstate.global_pipe is not None and 
         type(modules.util.appstate.global_pipe).__name__ == "FluxFillPipeline" and 
+            modules.util.appstate.global_performance_optimization == performance_optimization and
             modules.util.appstate.global_memory_mode == memory_optimization):
                 print(">>>>Reusing FluxFillPipeline pipe<<<<")
                 return modules.util.appstate.global_pipe
@@ -39,6 +40,8 @@ def get_pipeline(memory_optimization):
         "mit-han-lab/svdq-int4-flux.1-fill-dev", 
         offload=True
     )
+    if performance_optimization == "nunchaku-fp16":
+        transformer.set_attention_impl("nunchaku-fp16")
     text_encoder_2 = NunchakuT5EncoderModel.from_pretrained(
         "mit-han-lab/svdq-flux.1-t5"
     )
@@ -48,7 +51,11 @@ def get_pipeline(memory_optimization):
         text_encoder_2=text_encoder_2,
         torch_dtype=torch.bfloat16
     )
-
+    if performance_optimization == "apply_cache_on_pipe":
+        from nunchaku.caching.diffusers_adapters import apply_cache_on_pipe
+        apply_cache_on_pipe(
+            modules.util.appstate.global_pipe, residual_diff_threshold=0.12
+        )
     if memory_optimization == "Extremely Low VRAM":
         modules.util.appstate.global_pipe.enable_sequential_cpu_offload()
     else:
@@ -56,11 +63,13 @@ def get_pipeline(memory_optimization):
         
     # Update global variables
     modules.util.appstate.global_memory_mode = memory_optimization
+    modules.util.appstate.global_performance_optimization = performance_optimization
     return modules.util.appstate.global_pipe
 
 def generate_images(
     seed, prompt, width, height, guidance_scale, num_inference_steps, 
-    memory_optimization, no_of_images, randomize_seed, input_image, mask_image
+    memory_optimization, no_of_images, randomize_seed, input_image, mask_image,
+    performance_optimization
 ):
     if modules.util.appstate.global_inference_in_progress == True:
         print(">>>>Inference in progress, can't continue<<<<")
@@ -70,7 +79,7 @@ def generate_images(
 
     try:
         # Get pipeline (either cached or newly loaded)
-        pipe = get_pipeline(memory_optimization)
+        pipe = get_pipeline(memory_optimization, performance_optimization)
         progress_bar = gr.Progress(track_tqdm=True)
         
         def callback_on_step_end(pipe, i, t, callback_kwargs):
@@ -127,6 +136,7 @@ def generate_images(
                 "width": width,
                 "height": height,
                 "memory_optimization": memory_optimization,
+                "performance_optimization": performance_optimization,
                 "timestamp": timestamp,
                 "generation_time": generation_time,
             }
@@ -150,14 +160,20 @@ def generate_images(
 def create_flux_fill_tab():
     initial_state = state_manager.get_state("flux-fill") or {}
     with gr.Row():
+        flux_memory_optimization = gr.Radio(
+            choices=["No optimization", "Extremely Low VRAM"],
+            label="Memory Optimization",
+            value=initial_state.get("memory_optimization", "Extremely Low VRAM"),
+            interactive=True
+        )
+        flux_performance_optimization = gr.Radio(
+            choices=["No optimization", "nunchaku-fp16", "apply_cache_on_pipe"],
+            label="Performance Optimization",
+            value=initial_state.get("performance_optimization", "apply_cache_on_pipe"),
+            interactive=True
+        )
+    with gr.Row():
         with gr.Column():
-            with gr.Row():
-                flux_memory_optimization = gr.Radio(
-                    choices=["No optimization", "Extremely Low VRAM"],
-                    label="Memory Optimization",
-                    value=initial_state.get("memory_optimization", "Extremely Low VRAM"),
-                    interactive=True
-                )
             with gr.Row():
                 flux_input_image = gr.Image(label="Input Image", type="pil")
             with gr.Row():
@@ -205,9 +221,8 @@ def create_flux_fill_tab():
                 )
                 flux_randomize_seed = gr.Checkbox(label="Randomize seed", value=False, interactive=True)
     with gr.Row():
-        save_state_button = gr.Button("💾 Save State")
-    with gr.Row():
         generate_button = gr.Button("🎨 Generate image")
+        save_state_button = gr.Button("💾 Save State")
     output_gallery = gr.Gallery(
         label="Generated Image(s)",
         columns=3,
@@ -215,18 +230,19 @@ def create_flux_fill_tab():
         height="auto"
     )
 
-    def save_current_state(memory_optimization, width, height, guidance_scale, inference_steps):
+    def save_current_state(memory_optimization, width, height, guidance_scale, inference_steps, performance_optimization):
         state_dict = {
             "memory_optimization": memory_optimization,
             "width": width,
             "height": height,
             "guidance_scale": guidance_scale,
-            "inference_steps": inference_steps
+            "inference_steps": inference_steps,
+            "performance_optimization": performance_optimization
         }
         # print("Saving state:", state_dict)
         initial_state = state_manager.get_state("flux-fill") or {}
         state_manager.save_state("flux-fill", state_dict)
-        return memory_optimization, width, height, guidance_scale, inference_steps
+        return memory_optimization, width, height, guidance_scale, inference_steps, performance_optimization
     
     # Event handlers
     random_button.click(fn=random_seed, outputs=[seed_input])
@@ -237,14 +253,16 @@ def create_flux_fill_tab():
             flux_width_input, 
             flux_height_input, 
             flux_guidance_scale_slider, 
-            flux_num_inference_steps_input
+            flux_num_inference_steps_input,
+            flux_performance_optimization
         ],
         outputs=[
             flux_memory_optimization, 
             flux_width_input, 
             flux_height_input, 
             flux_guidance_scale_slider, 
-            flux_num_inference_steps_input
+            flux_num_inference_steps_input,
+            flux_performance_optimization
         ]
     )
 
@@ -255,7 +273,7 @@ def create_flux_fill_tab():
             flux_width_input, flux_height_input, flux_guidance_scale_slider, 
             flux_num_inference_steps_input, flux_memory_optimization, 
             flux_no_of_images_input, flux_randomize_seed, flux_input_image,
-            flux_mask_image
+            flux_mask_image, flux_performance_optimization
         ],
         outputs=[output_gallery]
     )

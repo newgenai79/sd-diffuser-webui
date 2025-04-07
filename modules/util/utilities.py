@@ -42,11 +42,12 @@ def clear_previous_model_memory():
     modules.util.appstate.global_bypass_token_limit = None
     del modules.util.appstate.global_text_encoder_2
     modules.util.appstate.global_text_encoder_2 = None
+    modules.util.appstate.global_performance_optimization = None
     # Force garbage collection and CUDA memory cleanup
     gc.collect()
     torch.cuda.empty_cache()
-    torch.cuda.ipc_collect()  # Helps with shared memory issues
-    torch.cuda.synchronize()  # Ensure all operations are completed
+    torch.cuda.ipc_collect()
+    torch.cuda.synchronize()
     
     # Debugging memory usage
     print("CUDA allocated:", torch.cuda.memory_allocated() / 1e6, "MB")

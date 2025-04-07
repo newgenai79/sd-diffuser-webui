@@ -21,13 +21,14 @@ OUTPUT_DIR = "output/t2i/Flux_shuttle_jaguar"
 def random_seed():
     return torch.randint(0, MAX_SEED, (1,)).item()
 
-def get_pipeline(model_type, memory_optimization, bypass_token_limit):
-    print("----Flux mode: ", model_type, memory_optimization)
+def get_pipeline(model_type, memory_optimization, bypass_token_limit, performance_optimization):
+    print("----Flux mode: ", model_type, memory_optimization, performance_optimization)
     # If model is already loaded with same configuration, reuse it
     if (modules.util.appstate.global_pipe is not None and 
      type(modules.util.appstate.global_pipe).__name__ == "FluxPipeline" and 
       modules.util.appstate.global_model_type == model_type and
        modules.util.appstate.global_bypass_token_limit == bypass_token_limit and 
+       modules.util.appstate.global_performance_optimization == performance_optimization and
         modules.util.appstate.global_memory_mode == memory_optimization):
         print(">>>>Reusing flux Default pipe<<<<")
         if bypass_token_limit:
@@ -45,6 +46,8 @@ def get_pipeline(model_type, memory_optimization, bypass_token_limit):
         transformer_repo, 
         offload=True
     )
+    if performance_optimization == "nunchaku-fp16":
+        transformer.set_attention_impl("nunchaku-fp16")
     text_encoder_2 = NunchakuT5EncoderModel.from_pretrained(
         "mit-han-lab/svdq-flux.1-t5"
     )
@@ -66,7 +69,11 @@ def get_pipeline(model_type, memory_optimization, bypass_token_limit):
             transformer=transformer, 
             torch_dtype=torch.bfloat16
         )
-
+    if performance_optimization == "apply_cache_on_pipe":
+        from nunchaku.caching.diffusers_adapters import apply_cache_on_pipe
+        apply_cache_on_pipe(
+            modules.util.appstate.global_pipe, residual_diff_threshold=0.12
+        )
     if memory_optimization == "Extremely Low VRAM":
         modules.util.appstate.global_pipe.enable_sequential_cpu_offload()
     else:
@@ -77,6 +84,7 @@ def get_pipeline(model_type, memory_optimization, bypass_token_limit):
     modules.util.appstate.global_model_type = model_type
     modules.util.appstate.global_bypass_token_limit = bypass_token_limit
     modules.util.appstate.global_text_encoder_2 = text_encoder_2
+    modules.util.appstate.global_performance_optimization = performance_optimization
     if bypass_token_limit:
         return modules.util.appstate.global_pipe, modules.util.appstate.global_text_encoder_2
     else:
@@ -84,7 +92,8 @@ def get_pipeline(model_type, memory_optimization, bypass_token_limit):
 def generate_images(
     seed, prompt, width, height, guidance_scale,
     num_inference_steps, memory_optimization, model_type,
-    no_of_images, randomize_seed, bypass_token_limit, negative_prompt
+    no_of_images, randomize_seed, bypass_token_limit, negative_prompt,
+    performance_optimization
 ):
     if modules.util.appstate.global_inference_in_progress == True:
         print(">>>>Inference in progress, can't continue<<<<")
@@ -94,10 +103,8 @@ def generate_images(
     
     try:
         # Get pipeline (either cached or newly loaded)
-        pipe, text_encoder_2 = get_pipeline(model_type, memory_optimization, bypass_token_limit)
-        print("Pipeline ready for inference.....")
+        pipe, text_encoder_2 = get_pipeline(model_type, memory_optimization, bypass_token_limit, performance_optimization)
         progress_bar = gr.Progress(track_tqdm=True)
-        
         def callback_on_step_end(pipe, i, t, callback_kwargs):
             progress_bar(i / num_inference_steps, desc=f"Generating image {img_idx+1}: (Step {i}/{num_inference_steps})")
             return callback_kwargs
@@ -182,6 +189,7 @@ def generate_images(
                 "width": width,
                 "height": height,
                 "memory_optimization": memory_optimization,
+                "performance_optimization": performance_optimization,
                 "timestamp": timestamp,
                 "generation_time": generation_time,
             }
@@ -211,6 +219,19 @@ def create_shuttle_jaguar_tab():
     gr.HTML("<style>.small-button { max-width: 2.2em; min-width: 2.2em !important; height: 2.4em; align-self: end; line-height: 1em; border-radius: 0.5em; }</style>", visible=False)
     initial_state = state_manager.get_state("shuttle-jaguar") or {}
     with gr.Row():
+        flux_memory_optimization = gr.Radio(
+            choices=["No optimization", "Extremely Low VRAM"],
+            label="Memory Optimization",
+            value=initial_state.get("memory_optimization", "Extremely Low VRAM"),
+            interactive=True
+        )
+        flux_performance_optimization = gr.Radio(
+            choices=["No optimization", "nunchaku-fp16", "apply_cache_on_pipe"],
+            label="Performance Optimization",
+            value=initial_state.get("performance_optimization", "apply_cache_on_pipe"),
+            interactive=True
+        )
+    with gr.Row():
         with gr.Column():
             with gr.Row():
                 flux_bypass_token_limit = gr.Checkbox(label="Bypass 77 tokens limit (consumes more VRAM during text encoding)", value=initial_state.get("bypass_token_limit", False), interactive=True)
@@ -233,13 +254,6 @@ def create_shuttle_jaguar_tab():
                     value=initial_state.get("model_type", "Shuttle-jaguar"),
                     label="Select model",
                     interactive=True,
-                )
-            with gr.Row():
-                flux_memory_optimization = gr.Radio(
-                    choices=["No optimization", "Extremely Low VRAM"],
-                    label="Memory Optimization",
-                    value=initial_state.get("memory_optimization", "Extremely Low VRAM"),
-                    interactive=True
                 )
             with gr.Row():
                 flux_width_input = gr.Number(
@@ -286,7 +300,7 @@ def create_shuttle_jaguar_tab():
         height="auto"
     )
 
-    def save_current_state(model_type, memory_optimization, width, height, guidance_scale, inference_steps, bypass_token_limit):
+    def save_current_state(model_type, memory_optimization, width, height, guidance_scale, inference_steps, bypass_token_limit, performance_optimization):
         state_dict = {
             "model_type": model_type,
             "memory_optimization": memory_optimization,
@@ -294,12 +308,13 @@ def create_shuttle_jaguar_tab():
             "height": height,
             "guidance_scale": guidance_scale,
             "inference_steps": inference_steps,
-            "bypass_token_limit": bypass_token_limit
+            "bypass_token_limit": bypass_token_limit,
+            "performance_optimization": performance_optimization
         }
         # print("Saving state:", state_dict)
         initial_state = state_manager.get_state("shuttle-jaguar") or {}
         state_manager.save_state("shuttle-jaguar", state_dict)
-        return model_type, memory_optimization, width, height, guidance_scale, inference_steps, bypass_token_limit
+        return model_type, memory_optimization, width, height, guidance_scale, inference_steps, bypass_token_limit, performance_optimization
     
     # Event handlers
     random_button.click(fn=random_seed, outputs=[seed_input])
@@ -312,7 +327,8 @@ def create_shuttle_jaguar_tab():
             flux_height_input, 
             flux_guidance_scale_slider, 
             flux_num_inference_steps_input,
-            flux_bypass_token_limit
+            flux_bypass_token_limit,
+            flux_performance_optimization
         ],
         outputs=[
             flux_model_type,
@@ -321,7 +337,8 @@ def create_shuttle_jaguar_tab():
             flux_height_input, 
             flux_guidance_scale_slider, 
             flux_num_inference_steps_input,
-            flux_bypass_token_limit
+            flux_bypass_token_limit,
+            flux_performance_optimization
         ]
     )
 
@@ -332,7 +349,8 @@ def create_shuttle_jaguar_tab():
             flux_width_input, flux_height_input, flux_guidance_scale_slider, 
             flux_num_inference_steps_input, flux_memory_optimization, flux_model_type,
             flux_no_of_images_input, flux_randomize_seed, 
-            flux_bypass_token_limit, flux_negative_prompt_input
+            flux_bypass_token_limit, flux_negative_prompt_input,
+            flux_performance_optimization
         ],
         outputs=[output_gallery]
     )

@@ -84,16 +84,8 @@ conda activate sddw
 
 <b>Step 5: Install requirements</b>
 
-Windows
 ```
-pip install -r requirements_windows.txt
-```
-
-<br />
-
-Linux
-```
-pip install -r requirements_linux.txt
+pip install -r requirements.txt
 ```
 
 <b>Step 6: Launch gradio based WebUI</b>
