@@ -55,12 +55,12 @@
 <hr /-->
 
 
-<h3 align='center'>To-Do List</h3>
+<!--h3 align='center'>To-Do List</h3>
 - [ ] Text 2 image: Lumina-Image 2.0 with Lora support<br />
-- [ ] Text 2 image: Wan 2.1 - 1.3B<br />
+- [ ] Text 2 image: Wan 2.1 - 1.3B<br /-->
 
 <hr />
-<h3 align='center'>Installation guide for Windows (Currently WIP)</h3>
+<h3 align='center'>Installation guide for Windows</h3>
 
 <b>Step 1: Clone the repository</b>
 ```	
