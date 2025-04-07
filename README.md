@@ -88,7 +88,13 @@ conda activate sddw
 pip install -r requirements.txt
 ```
 
-<b>Step 6: Launch gradio based WebUI</b>
+<b>Step 6: Install SVDQuant/nunchaku requirements (optional)</b>
+
+```
+pip install -r requirements_svdquant.txt
+```
+
+<b>Step 7: Launch gradio based WebUI</b>
 ```	
 python app.py
 ```
