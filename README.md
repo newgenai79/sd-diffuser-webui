@@ -119,6 +119,9 @@ python app.py
 	<li>Cuda V12.0.140 - Build cuda_12.0.r12.0/compiler.32267302_0</li>
 </ul>
 <hr />
+
+<b>All models inherit the license of the original model.</b>
+<hr />
 <div align='center'>
 Credits: 
 <br />
