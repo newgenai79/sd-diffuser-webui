@@ -71,7 +71,7 @@ def generate_video(
         pipe = get_pipeline(memory_optimization, vaeslicing, vaetiling)
         progress_bar = gr.Progress(track_tqdm=True)
         def callback_on_step_end(pipe, i, t, callback_kwargs):
-            progress_bar(i / num_inference_steps, desc=f"Generating image (Step {i}/{num_inference_steps})")
+            progress_bar(i / num_inference_steps, desc=f"Generating video (Step {i}/{num_inference_steps})")
             return callback_kwargs
         generator = torch.Generator(device="cuda").manual_seed(seed)
         
