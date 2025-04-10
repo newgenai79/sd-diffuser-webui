@@ -93,3 +93,33 @@ def enable_vram_management(model: torch.nn.Module, module_map: dict, module_conf
     enable_vram_management_recursively(model, module_map, module_config, max_num_param, overflow_module_config, total_num_param=0)
     model.vram_management_enabled = True
 
+def disable_vram_management(model: torch.nn.Module):
+    def unwrap_module(module):
+        if isinstance(module, (AutoWrappedModule, AutoWrappedLinear)):
+            return module.module if hasattr(module, "module") else torch.nn.Linear(
+                in_features=module.in_features,
+                out_features=module.out_features,
+                bias=module.bias is not None,
+                dtype=module.weight.dtype,
+                device="cpu"
+            )
+        return module
+
+    def recursively_unwrap(model):
+        for name, child in list(model.named_children()):
+            unwrapped = unwrap_module(child)
+            if unwrapped is not child:
+                setattr(model, name, unwrapped)
+                child = unwrapped
+            recursively_unwrap(child)
+
+    recursively_unwrap(model)
+
+    # Move to CPU and clear vram flag
+    try:
+        model.to("cpu")
+    except:
+        pass
+
+    if hasattr(model, "vram_management_enabled"):
+        delattr(model, "vram_management_enabled")

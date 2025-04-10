@@ -17,6 +17,7 @@ global_selected_lora = None
 global_bypass_token_limit = None
 global_text_encoder_2 = None
 global_performance_optimization = None
+global_model_manager = None
 class StateManager:
     def __init__(self):
         self.state_dir = "saved_state"

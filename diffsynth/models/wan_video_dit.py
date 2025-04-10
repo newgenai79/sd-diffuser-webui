@@ -108,6 +108,16 @@ class RMSNorm(nn.Module):
         return self.norm(x.float()).to(dtype) * self.weight
 
 
+class AttentionModule(nn.Module):
+    def __init__(self, num_heads):
+        super().__init__()
+        self.num_heads = num_heads
+        
+    def forward(self, q, k, v):
+        x = flash_attention(q=q, k=k, v=v, num_heads=self.num_heads)
+        return x
+
+
 class SelfAttention(nn.Module):
     def __init__(self, dim: int, num_heads: int, eps: float = 1e-6):
         super().__init__()
@@ -121,17 +131,16 @@ class SelfAttention(nn.Module):
         self.o = nn.Linear(dim, dim)
         self.norm_q = RMSNorm(dim, eps=eps)
         self.norm_k = RMSNorm(dim, eps=eps)
+        
+        self.attn = AttentionModule(self.num_heads)
 
     def forward(self, x, freqs):
         q = self.norm_q(self.q(x))
         k = self.norm_k(self.k(x))
         v = self.v(x)
-        x = flash_attention(
-            q=rope_apply(q, freqs, self.num_heads),
-            k=rope_apply(k, freqs, self.num_heads),
-            v=v,
-            num_heads=self.num_heads
-        )
+        q = rope_apply(q, freqs, self.num_heads)
+        k = rope_apply(k, freqs, self.num_heads)
+        x = self.attn(q, k, v)
         return self.o(x)
 
 
@@ -153,6 +162,8 @@ class CrossAttention(nn.Module):
             self.k_img = nn.Linear(dim, dim)
             self.v_img = nn.Linear(dim, dim)
             self.norm_k_img = RMSNorm(dim, eps=eps)
+            
+        self.attn = AttentionModule(self.num_heads)
 
     def forward(self, x: torch.Tensor, y: torch.Tensor):
         if self.has_image_input:
@@ -163,7 +174,7 @@ class CrossAttention(nn.Module):
         q = self.norm_q(self.q(x))
         k = self.norm_k(self.k(ctx))
         v = self.v(ctx)
-        x = flash_attention(q, k, v, num_heads=self.num_heads)
+        x = self.attn(q, k, v)
         if self.has_image_input:
             k_img = self.norm_k_img(self.k_img(img))
             v_img = self.v_img(img)
@@ -171,6 +182,13 @@ class CrossAttention(nn.Module):
             x = x + y
         return self.o(x)
 
+
+class GateModule(nn.Module):
+    def __init__(self,):
+        super().__init__()
+
+    def forward(self, x, gate, residual):
+        return x + gate * residual
 
 class DiTBlock(nn.Module):
     def __init__(self, has_image_input: bool, dim: int, num_heads: int, ffn_dim: int, eps: float = 1e-6):
@@ -188,16 +206,17 @@ class DiTBlock(nn.Module):
         self.ffn = nn.Sequential(nn.Linear(dim, ffn_dim), nn.GELU(
             approximate='tanh'), nn.Linear(ffn_dim, dim))
         self.modulation = nn.Parameter(torch.randn(1, 6, dim) / dim**0.5)
+        self.gate = GateModule()
 
     def forward(self, x, context, t_mod, freqs):
         # msa: multi-head self-attention  mlp: multi-layer perceptron
         shift_msa, scale_msa, gate_msa, shift_mlp, scale_mlp, gate_mlp = (
             self.modulation.to(dtype=t_mod.dtype, device=t_mod.device) + t_mod).chunk(6, dim=1)
         input_x = modulate(self.norm1(x), shift_msa, scale_msa)
-        x = x + gate_msa * self.self_attn(input_x, freqs)
+        x = self.gate(x, gate_msa, self.self_attn(input_x, freqs))
         x = x + self.cross_attn(self.norm3(x), context)
         input_x = modulate(self.norm2(x), shift_mlp, scale_mlp)
-        x = x + gate_mlp * self.ffn(input_x)
+        x = self.gate(x, gate_mlp, self.ffn(input_x))
         return x
 
 
@@ -465,6 +484,62 @@ class WanModelStateDictConverter:
                 "has_image_input": True,
                 "patch_size": [1, 2, 2],
                 "in_dim": 36,
+                "dim": 5120,
+                "ffn_dim": 13824,
+                "freq_dim": 256,
+                "text_dim": 4096,
+                "out_dim": 16,
+                "num_heads": 40,
+                "num_layers": 40,
+                "eps": 1e-6
+            }
+        elif hash_state_dict_keys(state_dict) == "6d6ccde6845b95ad9114ab993d917893":
+            config = {
+                "has_image_input": True,
+                "patch_size": [1, 2, 2],
+                "in_dim": 36,
+                "dim": 1536,
+                "ffn_dim": 8960,
+                "freq_dim": 256,
+                "text_dim": 4096,
+                "out_dim": 16,
+                "num_heads": 12,
+                "num_layers": 30,
+                "eps": 1e-6
+            }
+        elif hash_state_dict_keys(state_dict) == "6bfcfb3b342cb286ce886889d519a77e":
+            config = {
+                "has_image_input": True,
+                "patch_size": [1, 2, 2],
+                "in_dim": 36,
+                "dim": 5120,
+                "ffn_dim": 13824,
+                "freq_dim": 256,
+                "text_dim": 4096,
+                "out_dim": 16,
+                "num_heads": 40,
+                "num_layers": 40,
+                "eps": 1e-6
+            }
+        elif hash_state_dict_keys(state_dict) == "349723183fc063b2bfc10bb2835cf677":
+            config = {
+                "has_image_input": True,
+                "patch_size": [1, 2, 2],
+                "in_dim": 48,
+                "dim": 1536,
+                "ffn_dim": 8960,
+                "freq_dim": 256,
+                "text_dim": 4096,
+                "out_dim": 16,
+                "num_heads": 12,
+                "num_layers": 30,
+                "eps": 1e-6
+            }
+        elif hash_state_dict_keys(state_dict) == "efa44cddf936c70abd0ea28b6cbe946c":
+            config = {
+                "has_image_input": True,
+                "patch_size": [1, 2, 2],
+                "in_dim": 48,
                 "dim": 5120,
                 "ffn_dim": 13824,
                 "freq_dim": 256,

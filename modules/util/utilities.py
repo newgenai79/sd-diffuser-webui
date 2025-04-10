@@ -9,6 +9,7 @@ import piexif.helper
 from pathlib import Path
 
 def clear_previous_model_memory():
+
     if modules.util.appstate.global_pipe is not None:
         print(">>>>clear_previous_model_memory: Removing model from memory<<<<")
         
@@ -17,15 +18,17 @@ def clear_previous_model_memory():
             modules.util.appstate.global_pipe.remove_all_hooks()
         
         # Explicitly delete model components
-        if hasattr(modules.util.appstate.global_pipe, '__dict__'):
-            for attr_name, attr_value in list(modules.util.appstate.global_pipe.__dict__.items()):
-                if hasattr(attr_value, 'to'):
-                    try:
-                        attr_value.to("cpu")  # Move to CPU to free VRAM
-                    except:
-                        pass
-                delattr(modules.util.appstate.global_pipe, attr_name)
-        
+        if modules.util.appstate.global_model_manager is None:
+            if hasattr(modules.util.appstate.global_pipe, '__dict__'):
+                for attr_name, attr_value in list(modules.util.appstate.global_pipe.__dict__.items()):
+                    if hasattr(attr_value, 'to'):
+                        try:
+                            attr_value.to("cpu")  # Move to CPU to free VRAM
+                        except:
+                            pass
+                    delattr(modules.util.appstate.global_pipe, attr_name)
+    if modules.util.appstate.global_model_manager is not None:
+        del modules.util.appstate.global_model_manager
         # Delete the pipeline
         del modules.util.appstate.global_pipe
         
@@ -43,6 +46,7 @@ def clear_previous_model_memory():
     del modules.util.appstate.global_text_encoder_2
     modules.util.appstate.global_text_encoder_2 = None
     modules.util.appstate.global_performance_optimization = None
+    modules.util.appstate.global_model_manager = None
     # Force garbage collection and CUDA memory cleanup
     gc.collect()
     torch.cuda.empty_cache()
@@ -52,6 +56,135 @@ def clear_previous_model_memory():
     # Debugging memory usage
     print("CUDA allocated:", torch.cuda.memory_allocated() / 1e6, "MB")
     print("CUDA reserved:", torch.cuda.memory_reserved() / 1e6, "MB")
+
+"""
+def clear_previous_model_memory():
+    if modules.util.appstate.global_pipe is not None:
+        print(">>>>clear_previous_model_memory: Removing model from memory<<<<")
+        
+        # 1. Remove hooks if present (works for both pipeline types)
+        if hasattr(modules.util.appstate.global_pipe, 'remove_all_hooks'):
+            modules.util.appstate.global_pipe.remove_all_hooks()
+        
+        # 2. Identify pipeline type and handle special components
+        is_diffsynth = hasattr(modules.util.appstate.global_pipe, 'model_names')
+        
+        # 3. Handle DiffSynth-specific components if applicable
+        if is_diffsynth:
+            model_names = getattr(modules.util.appstate.global_pipe, 'model_names', [])
+            for component_name in model_names:
+                if hasattr(modules.util.appstate.global_pipe, component_name):
+                    component = getattr(modules.util.appstate.global_pipe, component_name)
+                    if component is not None:
+                        # print(f"Clearing DiffSynth component: {component_name}")
+                        try:
+                            # Move to CPU first
+                            if hasattr(component, 'to'):
+                                component.to("cpu")
+                            
+                            # Clear parameters if it's a module
+                            if isinstance(component, torch.nn.Module):
+                                for param in component.parameters():
+                                    if param.data is not None:
+                                        param.data = None
+                                    if param.grad is not None:
+                                        param.grad.data = None
+                                        param.grad = None
+                            
+                            # Set to None
+                            setattr(modules.util.appstate.global_pipe, component_name, None)
+                        except Exception as e:
+                            print(f"Error clearing {component_name}: {e}")
+        
+        # 4. General cleanup for all pipeline types
+        if hasattr(modules.util.appstate.global_pipe, '__dict__'):
+            # Get all attributes
+            attrs_to_process = list(modules.util.appstate.global_pipe.__dict__.items())
+            
+            # First pass: move everything to CPU
+            for attr_name, attr_value in attrs_to_process:
+                # Skip special attributes
+                if attr_name.startswith('_') and attr_name in ('_parameters', '_buffers', '_modules'):
+                    continue
+                
+                # Skip already processed DiffSynth components
+                if is_diffsynth and attr_name in getattr(modules.util.appstate.global_pipe, 'model_names', []):
+                    continue
+                    
+                # Move to CPU if possible
+                if hasattr(attr_value, 'to'):
+                    try:
+                        # print(f"Moving {attr_name} to CPU")
+                        attr_value.to("cpu")
+                    except Exception as e:
+                        print(f"Error moving {attr_name} to CPU: {e}")
+                
+                # Handle modules specifically
+                if isinstance(attr_value, torch.nn.Module):
+                    try:
+                        for param in attr_value.parameters():
+                            if param.data is not None:
+                                param.data = None
+                            if param.grad is not None:
+                                param.grad.data = None
+                                param.grad = None
+                    except Exception as e:
+                        print(f"Error clearing parameters for {attr_name}: {e}")
+            
+            # Second pass: delete attributes
+            for attr_name, _ in attrs_to_process:
+                # Skip special PyTorch attributes
+                if attr_name.startswith('_') and attr_name in ('_parameters', '_buffers', '_modules'):
+                    continue
+                
+                # Skip already processed DiffSynth components
+                if is_diffsynth and attr_name in getattr(modules.util.appstate.global_pipe, 'model_names', []):
+                    continue
+                    
+                # print(f"Deleting {attr_name}")
+                try:
+                    delattr(modules.util.appstate.global_pipe, attr_name)
+                except Exception as e:
+                    print(f"Error deleting {attr_name}: {e}")
+        
+        # 5. Delete the pipeline itself
+        del modules.util.appstate.global_pipe
+    
+    # 6. Reset all global state variables
+    modules.util.appstate.global_pipe = None
+    modules.util.appstate.global_memory_mode = None
+    modules.util.appstate.global_inference_type = None
+    modules.util.appstate.global_model_type = None
+    modules.util.appstate.global_quantization = None
+    modules.util.appstate.global_selected_gguf = None
+    
+    # 7. Handle text encoders safely
+    for encoder_name in ['global_textencoder', 'global_text_encoder_2']:
+        if hasattr(modules.util.appstate, encoder_name):
+            encoder = getattr(modules.util.appstate, encoder_name)
+            if encoder is not None:
+                del encoder
+            setattr(modules.util.appstate, encoder_name, None)
+    
+    modules.util.appstate.global_selected_lora = None
+    modules.util.appstate.global_bypass_token_limit = None
+    modules.util.appstate.global_performance_optimization = None
+    
+    # 8. Thorough memory cleanup
+    gc.collect()
+    torch.cuda.empty_cache()
+    torch.cuda.ipc_collect()
+    
+    for _ in range(2):
+        torch.cuda.synchronize()
+        gc.collect()
+        torch.cuda.empty_cache()
+    
+  
+    # 9. Display memory usage
+    print("CUDA allocated:", torch.cuda.memory_allocated() / 1e6, "MB")
+    print("CUDA reserved:", torch.cuda.memory_reserved() / 1e6, "MB")
+"""
 
 def pad_tensors_to_equal_length(prompt_embeds, negative_prompt_embeds):
     """Pad the shorter tensor to match the longer one's sequence length"""

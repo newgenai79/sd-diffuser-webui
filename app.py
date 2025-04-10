@@ -32,11 +32,12 @@ from modules.svdquant.tab_flux_fill_dev import create_flux_fill_tab
 from modules.svdquant.tab_flux_redux_dev import create_flux_redux_tab
 
 # Video generation
-from modules.video_generation.tab_ltx095_t2v import create_ltx095_tab
+from modules.video_generation.tab_ltx095 import create_ltx095_tab
+from modules.video_generation.tab_wan21_13 import create_wan21_tab
 
 # Text 2 Video
 from modules.text2video.tab_skyreels_t2v import create_skyreels_t2v_tab
-from modules.text2video.tab_wan21_t2v import create_wan21_t2v_tab
+# from modules.text2video.tab_wan21_t2v import create_wan21_t2v_tab
 
 # Image 2 Video
 from modules.image2video.tab_ltximage2video091 import create_ltximage2video091_tab
@@ -166,13 +167,13 @@ with gr.Blocks() as dwebui:
                     create_shuttle_jaguar_tab()
         with gr.Tab("Video generation"):
             with gr.Tabs():
+                with gr.Tab("Wan2.1-1.3B"):
+                    create_wan21_tab() 
                 with gr.Tab("LTX Video 0.9.5"):
                     create_ltx095_tab()
         # Text 2 Video Tab
         with gr.Tab("Text 2 Video"):
             with gr.Tabs():
-                with gr.Tab("Wan2.1-1.3B-T2V"):
-                    create_wan21_t2v_tab()           
                 with gr.Tab("SkyworkAI- SkyReels"):
                     create_skyreels_t2v_tab()
         with gr.Tab("Image 2 Video"):

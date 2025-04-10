@@ -14,9 +14,10 @@
 	<a href='https://github.com/yandex-research/swd'><img src='https://img.shields.io/badge/SWD_SD3.5_Medium_/_Large-red'></a>
 </div>
 
-<h2 align='center'>Supported Text-2-Video models</h2>
+<h2 align='center'>Video generation</h2>
 <div align='center'>
 	<a href='https://github.com/Wan-Video/Wan2.1'><img src='https://img.shields.io/badge/Wan_2.1_1.3B-red'></a>
+	<a href='https://github.com/Lightricks/LTX-Video'><img src='https://img.shields.io/badge/LTX_Video_0.9.5-blue'></a>
 </div>
 
 <h2 align='center'>Supported Image-2-Video models</h2>
