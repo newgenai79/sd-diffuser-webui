@@ -136,7 +136,7 @@ def get_pipeline(inference_type, memory_optimization):
 def generate_video(
     seed, prompt, negative_prompt, width, height, fps, num_inference_steps, 
     num_frames, memory_optimization, quality, tea_cache_l1_thresh,
-    inference_type, t2v_mode, image, video
+    inference_type, t2v_mode, image, end_image, video
 ):
     if modules.util.appstate.global_inference_in_progress == True:
         print(">>>>Inference in progress, can't continue<<<<")
@@ -171,6 +171,9 @@ def generate_video(
             fname = "i2v"
             input_image = Image.open(image)
             inference_params["input_image"] = input_image
+            if end_image:
+                end_input_image = Image.open(end_image)
+                inference_params["end_image"] = end_input_image
         elif inference_type == "Control":
             fname = "control"
             control_video = VideoData(video, height=height, width=width)
@@ -195,6 +198,8 @@ def generate_video(
         modules.util.appstate.global_inference_in_progress = False
         if inference_type == "Image to video":
             del input_image
+            if end_image:
+                del end_input_image
         if inference_type == "Control":
             del control_video
         del video
@@ -238,17 +243,22 @@ def create_wan21_tab():
             interactive=True
         )
     with gr.Row():
-        with gr.Column():
-            wan21_t2v_mode = gr.Radio(
-                choices=["Normal", "Fast", "Slow"],
-                label="Video speed (T2V)",
-                value=initial_state.get("t2v_mode", "Normal"),
-                interactive=True
-            )
-        with gr.Column():
-            wan21_image = gr.Image(label="Image (I2V)", type="filepath", width=256, height=256, interactive=False)
-        with gr.Column():
-            wan21_video = gr.Video(label="Video (Control)", show_label=True, width=256, height=256, interactive=False)
+        with gr.Column(scale=15):
+            with gr.Accordion("Speed for T2V", open=True) as accordion_t2v:
+                wan21_t2v_mode = gr.Radio(
+                    choices=["Normal", "Fast", "Slow"],
+                    label="Video speed (T2V)",
+                    value=initial_state.get("t2v_mode", "Normal"),
+                    interactive=True
+                )
+        with gr.Column(scale=60):
+            with gr.Accordion("Select image(s) for I2V", open=False) as accordion_i2v:
+                with gr.Row():
+                    wan21_image = gr.Image(label="Image (I2V)", type="filepath", width=256, height=256, interactive=False)
+                    wan21_end_image = gr.Image(label="End image (optional)", type="filepath", width=256, height=256, interactive=False)
+        with gr.Column(scale=25):
+            with gr.Accordion("Select video for Control", open=False) as accordion_control:
+                wan21_video = gr.Video(label="Video (Control)", show_label=True, width=256, height=256, interactive=False)
     with gr.Row():
         with gr.Column():
             with gr.Row():
@@ -322,9 +332,10 @@ def create_wan21_tab():
 
     # Event handlers
     def toggle_interactive(inference_type):
-        return gr.update(interactive=(inference_type == "Text to video")), gr.update(interactive=(inference_type == "Image to video")), gr.update(interactive=(inference_type == "Control"))
+        return gr.update(interactive=(inference_type == "Text to video")), gr.update(interactive=(inference_type == "Image to video")), gr.update(interactive=(inference_type == "Image to video")), gr.update(interactive=(inference_type == "Control")), gr.update(open=(inference_type == "Text to video")), gr.update(open=(inference_type == "Image to video")), gr.update(open=(inference_type == "Control"))
 
-    wan21_inference_type.change(toggle_interactive, inputs=[wan21_inference_type], outputs=[wan21_t2v_mode, wan21_image, wan21_video])
+    wan21_inference_type.change(toggle_interactive, inputs=[wan21_inference_type], 
+        outputs=[wan21_t2v_mode, wan21_image, wan21_end_image, wan21_video, accordion_t2v, accordion_i2v, accordion_control])
     random_button.click(fn=random_seed, outputs=[seed_input])
     """
     save_state_button.click(
@@ -350,7 +361,7 @@ def create_wan21_tab():
             wan21_height_input, wan21_fps_input, wan21_num_inference_steps_input, 
             wan21_num_frames_input, wan21_memory_optimization, wan21_quality_slider,
             wan21_tea_cache_l1_thresh_slider,
-            wan21_inference_type, wan21_t2v_mode, wan21_image, wan21_video
+            wan21_inference_type, wan21_t2v_mode, wan21_image, wan21_end_image, wan21_video
         ],
         outputs=[output_video]
     )
