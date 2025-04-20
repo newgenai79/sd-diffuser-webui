@@ -16,6 +16,7 @@
 
 <h2 align='center'>Video generation</h2>
 <div align='center'>
+	<a href='https://github.com/ali-vilab/VACE'><img src='https://img.shields.io/badge/VACE-blue'></a>
 	<a href='https://github.com/Wan-Video/Wan2.1'><img src='https://img.shields.io/badge/Wan_2.1_1.3B-red'></a>
 	<a href='https://github.com/Lightricks/LTX-Video'><img src='https://img.shields.io/badge/LTX_Video_0.9.5-blue'></a>
 </div>

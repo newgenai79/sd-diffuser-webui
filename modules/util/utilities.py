@@ -27,10 +27,10 @@ def clear_previous_model_memory():
                         except:
                             pass
                     delattr(modules.util.appstate.global_pipe, attr_name)
-    if modules.util.appstate.global_model_manager is not None:
-        del modules.util.appstate.global_model_manager
+        if modules.util.appstate.global_model_manager is not None:
+            del modules.util.appstate.global_model_manager
         # Delete the pipeline
-        del modules.util.appstate.global_pipe
+    del modules.util.appstate.global_pipe
         
     # Reset all global state variables
     modules.util.appstate.global_pipe = None

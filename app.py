@@ -34,6 +34,7 @@ from modules.svdquant.tab_flux_redux_dev import create_flux_redux_tab
 # Video generation
 from modules.video_generation.tab_ltx095 import create_ltx095_tab
 from modules.video_generation.tab_wan21_13 import create_wan21_tab
+from modules.video_generation.tab_vace import create_vace_tab
 
 # Text 2 Video
 from modules.text2video.tab_skyreels_t2v import create_skyreels_t2v_tab
@@ -167,6 +168,8 @@ with gr.Blocks() as dwebui:
                     create_shuttle_jaguar_tab()
         with gr.Tab("Video generation"):
             with gr.Tabs():
+                with gr.Tab("VACE-Wan2.1-1.3B-Preview"):
+                    create_vace_tab()
                 with gr.Tab("Wan2.1-1.3B"):
                     create_wan21_tab() 
                 with gr.Tab("LTX Video 0.9.5"):
