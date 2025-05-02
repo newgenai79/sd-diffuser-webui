@@ -9,7 +9,7 @@ einops
 opencv-python
 imageio
 imageio-ffmpeg
-gradio
+gradio>=5.28.0
 git+https://github.com/huggingface/diffusers.git
 protobuf
 gguf
