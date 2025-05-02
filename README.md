@@ -90,13 +90,31 @@ conda activate sddw
 pip install -r requirements.txt
 ```
 
-<b>Step 6: Install SVDQuant/nunchaku requirements (optional)</b>
+<b>Step 5a: Install SVDQuant/nunchaku requirements (optional)</b>
 
 ```
 pip install -r requirements_svdquant.txt
 ```
 
-<b>Step 7: Launch gradio based WebUI</b>
+<b>Step 5b: Install these if you want to use DWPose (optional)</b>
+
+```
+pip install -U openmim
+```
+
+```
+mim install mmcv==2.1.0
+```
+
+```
+mim install mmpose==1.3.2
+```
+
+```
+mim install mmdet==3.2.0
+```
+
+<b>Step 6: Launch gradio based WebUI</b>
 ```	
 python app.py
 ```
