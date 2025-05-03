@@ -1,5 +1,5 @@
---extra-index-url https://download.pytorch.org/whl/cu124
-torch==2.6.0+cu124
+--extra-index-url https://download.pytorch.org/whl/cu126
+torch==2.7.0+cu126
 torchvision
 torchaudio
 transformers>=4.49.0
@@ -19,15 +19,16 @@ bitsandbytes
 git+https://github.com/huggingface/optimum-quanto.git
 git+https://github.com/huggingface/peft.git
 patch_conv
-https://huggingface.co/datasets/newgenai79/Windows_wheels/resolve/main/TRITON/triton-3.1.0-cp311-cp311-win_amd64.whl?download=true; platform_system == "Windows" and python_version == "3.11"
+triton-windows; platform_system == "Windows"
 triton; platform_system == "Linux"
 piexif
 modelscope
 safetensors
-controlnet-aux
+git+https://github.com/huggingface/controlnet_aux.git
 cupy-cuda12x
 git+https://github.com/XPixelGroup/BasicSR.git
 realesrgan
 gfpgan
 ftfy
 mediapipe
+onnxruntime-gpu

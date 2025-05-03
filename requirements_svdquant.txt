@@ -1,4 +1,4 @@
-https://huggingface.co/mit-han-lab/nunchaku/resolve/main/nunchaku-0.2.0+torch2.6-cp311-cp311-win_amd64.whl?download=true; platform_system == "Windows" and python_version == "3.11"
-https://huggingface.co/mit-han-lab/nunchaku/resolve/main/nunchaku-0.2.0+torch2.6-cp311-cp311-linux_x86_64.whl?download=true; platform_system == "Linux" and python_version == "3.11"
+https://huggingface.co/mit-han-lab/nunchaku/resolve/main/nunchaku-0.2.0%2Btorch2.7-cp311-cp311-win_amd64.whl?download=true; platform_system == "Windows" and python_version == "3.11"
+https://huggingface.co/mit-han-lab/nunchaku/resolve/main/nunchaku-0.2.0%2Btorch2.7-cp311-cp311-linux_x86_64.whl?download=true; platform_system == "Linux" and python_version == "3.11"
 git+https://github.com/asomoza/image_gen_aux.git
 git+https://github.com/xhinker/sd_embed.git@main
