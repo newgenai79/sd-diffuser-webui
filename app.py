@@ -45,6 +45,7 @@ from modules.text2video.tab_skyreels_t2v import create_skyreels_t2v_tab
 from modules.image2video.tab_ltximage2video091 import create_ltximage2video091_tab
 
 # Extras
+from modules.extras.tab_omnigen import create_omnigen_tab
 from modules.extras.tab_video_upscale import create_video_upscaler_interface
 
 # Import utilities for metadata handling
@@ -188,6 +189,8 @@ with gr.Blocks() as dwebui:
                     create_ltximage2video091_tab()
         with gr.Tab("Extras"):
             with gr.Tabs():
+                with gr.Tab("OmniGen v1"):
+                    create_omnigen_tab()
                 with gr.Tab("Video upscaler"):
                     create_video_upscaler_interface()
         with gr.Tab("Info"):

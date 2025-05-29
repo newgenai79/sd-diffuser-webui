@@ -34,14 +34,16 @@ def get_pipeline(memory_optimization, vaeslicing, vaetiling):
 
     modules.util.appstate.global_pipe = OmniGenPipeline.from_pretrained(
         repo_id,
-        torch_dtype=torch.bfloat16
+        torch_dtype=torch.bfloat16,
+        cache_dir=f"models/{repo_id}",
     )
 
     if memory_optimization == "Low VRAM":
         modules.util.appstate.global_pipe.enable_model_cpu_offload()
     elif memory_optimization == "Extremely Low VRAM":
         modules.util.appstate.global_pipe.enable_sequential_cpu_offload()
-
+    else:
+        modules.util.appstate.global_pipe.to("cuda")
     if vaeslicing:
         modules.util.appstate.global_pipe.vae.enable_slicing()
     else:
@@ -50,7 +52,6 @@ def get_pipeline(memory_optimization, vaeslicing, vaetiling):
         modules.util.appstate.global_pipe.vae.enable_tiling()
     else:
         modules.util.appstate.global_pipe.vae.disable_tiling()
-
 
     modules.util.appstate.global_memory_mode = memory_optimization
     
@@ -167,12 +168,13 @@ def create_omnigen_tab():
             omnigen_memory_optimization = gr.Radio(
                 choices=["No optimization", "Low VRAM", "Extremely Low VRAM"],
                 label="Memory Optimization",
-                value=initial_state.get("memory_optimization", "Low VRAM"),
+                value=initial_state.get("memory_optimization", "Extremely Low VRAM"),
                 interactive=True
             )
         with gr.Column():
-            omnigen_vaeslicing = gr.Checkbox(label="VAE Slicing", value=initial_state.get("vaeslicing", True), interactive=True)
-            omnigen_vaetiling = gr.Checkbox(label="VAE Tiling", value=initial_state.get("vaetiling", True), interactive=True)
+            with gr.Row():
+                omnigen_vaeslicing = gr.Checkbox(label="VAE Slicing", value=initial_state.get("vaeslicing", False), interactive=True)
+                omnigen_vaetiling = gr.Checkbox(label="VAE Tiling", value=initial_state.get("vaetiling", True), interactive=True)
     with gr.Row():
         with gr.Column():
             omnigen_input_image1 = gr.Image(label="<img><|image_1|></img>", type="pil")
