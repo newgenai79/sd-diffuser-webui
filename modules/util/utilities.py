@@ -41,6 +41,8 @@ def clear_previous_model_memory():
     modules.util.appstate.global_selected_gguf = None
     del modules.util.appstate.global_textencoder
     modules.util.appstate.global_textencoder = None
+    del modules.util.appstate.global_transformer
+    modules.util.appstate.global_transformer = None   
     modules.util.appstate.global_selected_lora = None
     modules.util.appstate.global_bypass_token_limit = None
     del modules.util.appstate.global_text_encoder_2

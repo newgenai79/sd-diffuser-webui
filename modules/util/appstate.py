@@ -12,6 +12,7 @@ global_quantization = None
 global_inference_in_progress = False
 global_selected_gguf = None
 global_textencoder = None
+global_transformer = None
 global_model_type = None
 global_selected_lora = None
 global_bypass_token_limit = None
