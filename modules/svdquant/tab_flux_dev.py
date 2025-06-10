@@ -339,11 +339,12 @@ def create_flux_dev_tab():
                 lines=6,
                 interactive=True
             )
-    with gr.Accordion("LoRA Selection", open=False):
+    with gr.Accordion("LoRA Selection (Max 3). New lora addition require app to be restarted.", open=False):
+        """
         with gr.Row():
             gr.Markdown("### LoRA Selection (Max 3)")
             lora_refresh_btn = gr.Button("🔄", elem_classes="small-button")
-
+        """
         lora_checkboxes = {}
         lora_weights = {}
         lora_files = get_lora_files()
@@ -473,12 +474,12 @@ def create_flux_dev_tab():
             inputs=list(lora_checkboxes.values()),
             outputs=list(lora_checkboxes.values())
         )
-
+    """
     lora_refresh_btn.click(
         fn=lambda: [gr.Checkbox(label=f, value=False, interactive=True) for f in get_lora_files()],
         outputs=list(lora_checkboxes.values())
     )
-
+    """
     def save_current_state(memory_optimization, width, height, guidance_scale, inference_steps, bypass_token_limit, 
                           no_opt, nunchaku, double_cache, teacache, diff_multi, diff_single, tea_cache_thresh, *lora_inputs):
         # Split lora_inputs into checkboxes and weights
