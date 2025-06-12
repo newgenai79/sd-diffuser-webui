@@ -28,8 +28,6 @@ from modules.svdquant.tab_flux_dev import create_flux_dev_tab
 from modules.svdquant.tab_flux_schnell import create_flux_schnell_tab
 from modules.svdquant.tab_flux_shuttle_jaguar import create_shuttle_jaguar_tab
 from modules.svdquant.tab_flux_canny_dev import create_flux_canny_tab
-from modules.svdquant.tab_flux_depth_dev import create_flux_depth_tab
-from modules.svdquant.tab_flux_fill_dev import create_flux_fill_tab
 from modules.svdquant.tab_flux_redux_dev import create_flux_redux_tab
 
 # Video generation
