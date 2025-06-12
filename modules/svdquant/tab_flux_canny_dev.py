@@ -15,15 +15,33 @@ from diffusers import FluxControlPipeline
 from diffusers.utils import load_image
 from modules.util.utilities import clear_previous_model_memory
 from modules.util.appstate import state_manager
+from nunchaku.utils import get_precision
+from nunchaku.caching.diffusers_adapters import apply_cache_on_pipe
+from nunchaku.caching.teacache import TeaCache
+from contextlib import nullcontext
+from nunchaku.lora.flux.compose import compose_lora
 
 MAX_SEED = np.iinfo(np.int32).max
 OUTPUT_DIR = "output/t2i/Flux"
+lora_path = "models/lora/flux.1-dev-canny/"
+
+def get_lora_files():
+    lora_files = []
+    if os.path.exists(lora_path):
+        for file in os.listdir(lora_path):
+            if file.endswith(".safetensors"):
+                lora_files.append(file)
+    return lora_files
+
+def refresh_lora_list():
+    lora_files = get_lora_files()
+    return gr.update(choices=lora_files)
 
 def random_seed():
     return torch.randint(0, MAX_SEED, (1,)).item()
 
-def get_pipeline(memory_optimization, inference_type, performance_optimization):
-    print("----FluxControlPipeline mode: ", memory_optimization, inference_type)
+def get_pipeline(memory_optimization, inference_type, performance_optimization, diff_multi, diff_single):
+    print("----FluxControlPipeline mode: ", memory_optimization, inference_type, performance_optimization, diff_multi, diff_single)
     # If model is already loaded with same configuration, reuse it
     if (modules.util.appstate.global_pipe is not None and 
         type(modules.util.appstate.global_pipe).__name__ == "FluxControlPipeline" and 
@@ -37,15 +55,18 @@ def get_pipeline(memory_optimization, inference_type, performance_optimization):
         torch.cuda.synchronize()
 
     dtype = torch.bfloat16
-
+    precision = get_precision()
+    transformer_repo = f"mit-han-lab/nunchaku-flux.1-canny-dev/svdq-{precision}_r32-flux.1-canny-dev.safetensors"
     transformer = NunchakuFluxTransformer2dModel.from_pretrained(
-        "mit-han-lab/svdq-int4-flux.1-canny-dev", 
+        transformer_repo, 
         offload=True
     )
     if performance_optimization == "nunchaku-fp16":
         transformer.set_attention_impl("nunchaku-fp16")
+
+    text_encoder_2_repo = f"mit-han-lab/nunchaku-t5/awq-int4-flux.1-t5xxl.safetensors"
     text_encoder_2 = NunchakuT5EncoderModel.from_pretrained(
-        "mit-han-lab/svdq-flux.1-t5"
+        text_encoder_2_repo,
     )
     modules.util.appstate.global_pipe = FluxControlPipeline.from_pretrained(
         "black-forest-labs/FLUX.1-Canny-dev", 
@@ -53,10 +74,13 @@ def get_pipeline(memory_optimization, inference_type, performance_optimization):
         text_encoder_2=text_encoder_2,
         torch_dtype=torch.bfloat16
     )
-    if performance_optimization == "apply_cache_on_pipe":
-        from nunchaku.caching.diffusers_adapters import apply_cache_on_pipe
+
+    if performance_optimization == "double_cache":
         apply_cache_on_pipe(
-            modules.util.appstate.global_pipe, residual_diff_threshold=0.12
+            modules.util.appstate.global_pipe,
+            use_double_fb_cache=True,
+            residual_diff_threshold_multi=float(diff_multi),
+            residual_diff_threshold_single=float(diff_single),
         )
     if memory_optimization == "Extremely Low VRAM":
         modules.util.appstate.global_pipe.enable_sequential_cpu_offload()
@@ -67,13 +91,15 @@ def get_pipeline(memory_optimization, inference_type, performance_optimization):
     modules.util.appstate.global_memory_mode = memory_optimization
     modules.util.appstate.global_inference_type = inference_type
     modules.util.appstate.global_performance_optimization = performance_optimization
+    modules.util.appstate.global_text_encoder_2 = text_encoder_2
+    modules.util.appstate.global_transformer = transformer
     return modules.util.appstate.global_pipe
 
 def generate_images(
-    seed, prompt, width, height, guidance_scale, num_inference_steps, 
-    memory_optimization, no_of_images, randomize_seed, input_image,
+    seed, prompt, width, height, guidance_scale, num_inference_steps,
+    memory_optimization, no_of_images, randomize_seed, input_image, 
     low_threshold, high_threshold, detect_resolution, image_resolution,
-    performance_optimization
+    performance_optimization, diff_multi, diff_single, tea_cache_thresh,
 ):
     if modules.util.appstate.global_inference_in_progress == True:
         print(">>>>Inference in progress, can't continue<<<<")
@@ -83,9 +109,9 @@ def generate_images(
 
     try:
         # Get pipeline (either cached or newly loaded)
-        pipe = get_pipeline(memory_optimization, "flux.1-dev-canny", performance_optimization)
+        pipe = get_pipeline(memory_optimization, "flux.1-dev-canny", performance_optimization, diff_multi, diff_single)
+
         progress_bar = gr.Progress(track_tqdm=True)
-        
         def callback_on_step_end(pipe, i, t, callback_kwargs):
             progress_bar(i / num_inference_steps, desc=f"Generating image {img_idx+1}: (Step {i}/{num_inference_steps})")
             return callback_kwargs
@@ -117,16 +143,20 @@ def generate_images(
                 "height": height,
                 "width": width,
                 "guidance_scale": guidance_scale,
-                "num_inference_steps": num_inference_steps,
                 "generator": generator,
                 "callback_on_step_end": callback_on_step_end,
             }
-            
+            if performance_optimization != "teacache":
+                inference_params["num_inference_steps"] = num_inference_steps
             print(f"Generating image {img_idx+1}/{no_of_images} with seed: {current_seed}")
             
             start_time = datetime.now()
             # Generate image
-            image = pipe(**inference_params).images[0]
+            with (
+                TeaCache(model=modules.util.appstate.global_transformer, num_steps=num_inference_steps, rel_l1_thresh=float(tea_cache_thresh), enabled=True)
+                if performance_optimization == "teacache" else nullcontext()
+            ):
+                image = pipe(**inference_params).images[0]
             end_time = datetime.now()
             generation_time = (end_time - start_time).total_seconds()
             
@@ -172,20 +202,68 @@ def generate_images(
         modules.util.appstate.global_inference_in_progress = False
 
 def create_flux_canny_tab():
+    gr.HTML("<style>.small-button { max-width: 2.2em; min-width: 2.2em !important; height: 2.4em; align-self: end; line-height: 1em; border-radius: 0.5em; }</style>", visible=False)
     initial_state = state_manager.get_state("flux-canny") or {}
+    selected_perf_opt = initial_state.get("performance_optimization", "no_optimization")
     with gr.Row():
-        flux_memory_optimization = gr.Radio(
-            choices=["No optimization", "Extremely Low VRAM"],
-            label="Memory Optimization",
-            value=initial_state.get("memory_optimization", "Extremely Low VRAM"),
-            interactive=True
-        )
-        flux_performance_optimization = gr.Radio(
-            choices=["No optimization", "nunchaku-fp16", "apply_cache_on_pipe"],
-            label="Performance Optimization",
-            value=initial_state.get("performance_optimization", "apply_cache_on_pipe"),
-            interactive=True
-        )
+        with gr.Accordion("Optimizations", open=False):
+            with gr.Row():
+                flux_memory_optimization = gr.Radio(
+                    choices=["No optimization", "Extremely Low VRAM"],
+                    label="Memory Optimization",
+                    value=initial_state.get("memory_optimization", "Extremely Low VRAM"),
+                    interactive=True
+                )
+            gr.Markdown("### Performance Optimizations")
+            with gr.Row():
+                with gr.Column(scale=1, min_width=200):
+                    flux_no_optimization = gr.Checkbox(
+                        label="No optimization", 
+                        value=selected_perf_opt == "no_optimization", 
+                        interactive=True
+                    )
+                with gr.Column(scale=1, min_width=200):
+                    flux_nunchaku_fp16 = gr.Checkbox(
+                        label="nunchaku-fp16", 
+                        value=selected_perf_opt == "nunchaku_fp16", 
+                        interactive=True
+                    )
+                with gr.Column(scale=2, min_width=200):
+                    flux_double_cache = gr.Checkbox(
+                        label="Double cache", 
+                        value=selected_perf_opt == "double_cache", 
+                        interactive=True
+                    )
+                    flux_diff_multi = gr.Slider(
+                        label="Residual_diff_threshold_multi", 
+                        minimum=0, 
+                        maximum=1, 
+                        value=initial_state.get("diff_threshold_multi", 0.09),
+                        step=0.01,
+                        interactive=True
+                    )
+                    flux_diff_single = gr.Slider(
+                        label="Residual_diff_threshold_single", 
+                        minimum=0, 
+                        maximum=1, 
+                        value=initial_state.get("diff_threshold_single", 0.12),
+                        step=0.01,
+                        interactive=True
+                    )
+                with gr.Column(scale=2, min_width=300):
+                    flux_teacache = gr.Checkbox(
+                        label="Teacache", 
+                        value=selected_perf_opt == "teacache", 
+                        interactive=True
+                    )
+                    flux_tea_cache_l1_thresh_slider = gr.Slider(
+                        label="Tea cache (rel_l1_thresh)", 
+                        minimum=0, 
+                        maximum=1, 
+                        value=initial_state.get("tea_cache_threshold", 0.3),
+                        step=0.01,
+                        interactive=True
+                    )
 
     with gr.Row():
         with gr.Column():
@@ -271,20 +349,71 @@ def create_flux_canny_tab():
         rows=None,
         height="auto"
     )
+    def update_performance_checkboxes(no_opt, nunchaku, double_cache, teacache, clicked_option):
+        new_no_opt = False
+        new_nunchaku = False
+        new_double_cache = False
+        new_teacache = False
+        if clicked_option == "no_optimization":
+            new_no_opt = True
+        elif clicked_option == "nunchaku_fp16":
+            new_nunchaku = True
+        elif clicked_option == "double_cache":
+            new_double_cache = True
+        elif clicked_option == "teacache":
+            new_teacache = True
+        return new_no_opt, new_nunchaku, new_double_cache, new_teacache
+    
+    flux_no_optimization.change(
+        fn=lambda x, n, d, t: update_performance_checkboxes(x, n, d, t, "no_optimization") if x else (x, n, d, t),
+        inputs=[flux_no_optimization, flux_nunchaku_fp16, flux_double_cache, flux_teacache],
+        outputs=[flux_no_optimization, flux_nunchaku_fp16, flux_double_cache, flux_teacache]
+    )
+    
+    flux_nunchaku_fp16.change(
+        fn=lambda n, x, d, t: update_performance_checkboxes(x, n, d, t, "nunchaku_fp16") if n else (x, n, d, t),
+        inputs=[flux_nunchaku_fp16, flux_no_optimization, flux_double_cache, flux_teacache],
+        outputs=[flux_no_optimization, flux_nunchaku_fp16, flux_double_cache, flux_teacache]
+    )
+    
+    flux_double_cache.change(
+        fn=lambda d, x, n, t: update_performance_checkboxes(x, n, d, t, "double_cache") if d else (x, n, d, t),
+        inputs=[flux_double_cache, flux_no_optimization, flux_nunchaku_fp16, flux_teacache],
+        outputs=[flux_no_optimization, flux_nunchaku_fp16, flux_double_cache, flux_teacache]
+    )
+    
+    flux_teacache.change(
+        fn=lambda t, x, n, d: update_performance_checkboxes(x, n, d, t, "teacache") if t else (x, n, d, t),
+        inputs=[flux_teacache, flux_no_optimization, flux_nunchaku_fp16, flux_double_cache],
+        outputs=[flux_no_optimization, flux_nunchaku_fp16, flux_double_cache, flux_teacache]
+    )
 
-    def save_current_state(memory_optimization, width, height, guidance_scale, inference_steps, performance_optimization):
+    def save_current_state(memory_optimization, width, height, guidance_scale, inference_steps,  
+                          no_opt, nunchaku, double_cache, teacache, diff_multi, diff_single, tea_cache_thresh):
+       
+        performance_optimization = "no_optimization"
+        if nunchaku:
+            performance_optimization = "nunchaku_fp16"
+        elif double_cache:
+            performance_optimization = "double_cache"
+        elif teacache:
+            performance_optimization = "teacache"
+        
         state_dict = {
             "memory_optimization": memory_optimization,
+            "performance_optimization": performance_optimization,
             "width": width,
             "height": height,
             "guidance_scale": guidance_scale,
             "inference_steps": inference_steps,
-            "performance_optimization": performance_optimization
+            "diff_threshold_multi": diff_multi,
+            "diff_threshold_single": diff_single,
+            "tea_cache_threshold": tea_cache_thresh,
         }
-        # print("Saving state:", state_dict)
-        initial_state = state_manager.get_state("flux-canny") or {}
+        
         state_manager.save_state("flux-canny", state_dict)
-        return memory_optimization, width, height, guidance_scale, inference_steps, performance_optimization
+        return (memory_optimization, width, height, guidance_scale, inference_steps,  
+                no_opt, nunchaku, double_cache, teacache, diff_multi, diff_single, tea_cache_thresh)
     
     # Event handlers
     random_button.click(fn=random_seed, outputs=[seed_input])
@@ -296,7 +425,13 @@ def create_flux_canny_tab():
             flux_height_input, 
             flux_guidance_scale_slider, 
             flux_num_inference_steps_input,
-            flux_performance_optimization
+            flux_no_optimization,
+            flux_nunchaku_fp16,
+            flux_double_cache,
+            flux_teacache,
+            flux_diff_multi,
+            flux_diff_single,
+            flux_tea_cache_l1_thresh_slider,
         ],
         outputs=[
             flux_memory_optimization, 
@@ -304,20 +439,50 @@ def create_flux_canny_tab():
             flux_height_input, 
             flux_guidance_scale_slider, 
             flux_num_inference_steps_input,
-            flux_performance_optimization
+            flux_no_optimization,
+            flux_nunchaku_fp16,
+            flux_double_cache,
+            flux_teacache,
+            flux_diff_multi,
+            flux_diff_single,
+            flux_tea_cache_l1_thresh_slider,
         ]
     )
-
+    def generate_with_performance_opts(
+        seed, prompt, width, height, guidance_scale_slider, num_inference_steps,
+        memory_optimization, no_of_images, randomize_seed, 
+        input_image, low_threshold_slider, high_threshold_slider, 
+        detect_resolution, image_resolution,
+        no_opt, nunchaku, double_cache, teacache, diff_multi, diff_single, 
+        tea_cache_thresh,
+    ):
+     
+        if nunchaku:
+            performance_optimization = "nunchaku_fp16"
+        elif double_cache:
+            performance_optimization = "double_cache"
+        elif teacache:
+            performance_optimization = "teacache"
+        else:
+            performance_optimization = "no_optimization"
+        
+        return generate_images(
+            seed, prompt, width, height, guidance_scale_slider, num_inference_steps,
+            memory_optimization, no_of_images, randomize_seed, 
+            input_image, low_threshold_slider, high_threshold_slider, 
+            detect_resolution, image_resolution,
+            performance_optimization, diff_multi, diff_single, tea_cache_thresh,
+        )
     generate_button.click(
-        fn=generate_images,
+        fn=generate_with_performance_opts,
         inputs=[
-            seed_input, flux_prompt_input,  
-            flux_width_input, flux_height_input, flux_guidance_scale_slider, 
-            flux_num_inference_steps_input, flux_memory_optimization, 
-            flux_no_of_images_input, flux_randomize_seed, flux_input_image,
-            flux_low_threshold_slider, flux_high_threshold_slider, 
+            seed_input, flux_prompt_input, flux_width_input, flux_height_input, 
+            flux_guidance_scale_slider,  flux_num_inference_steps_input,
+            flux_memory_optimization, flux_no_of_images_input, flux_randomize_seed, 
+            flux_input_image, flux_low_threshold_slider, flux_high_threshold_slider, 
             flux_detect_resolution_input, flux_image_resolution_input,
-            flux_performance_optimization
+            flux_no_optimization, flux_nunchaku_fp16, flux_double_cache, flux_teacache, flux_diff_multi, flux_diff_single, 
+            flux_tea_cache_l1_thresh_slider,
         ],
         outputs=[output_gallery]
     )

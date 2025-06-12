@@ -24,10 +24,6 @@ MAX_SEED = np.iinfo(np.int32).max
 OUTPUT_DIR = "output/t2i/Flux"
 lora_path = "models/lora/flux.1-dev/"
 
-def return_adapter_name(s):
-    s = os.path.splitext(s)[0]
-    return re.sub(r'[^a-z0-9]', '', s)
-
 def get_lora_files():
     lora_files = []
     if os.path.exists(lora_path):
