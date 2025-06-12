@@ -11,7 +11,8 @@ import modules.util.appstate
 from datetime import datetime
 from nunchaku import NunchakuFluxTransformer2dModel, NunchakuT5EncoderModel
 from controlnet_aux import CannyDetector
-from diffusers import FluxControlPipeline
+from image_gen_aux import DepthPreprocessor
+from diffusers import FluxControlPipeline, FluxFillPipeline
 from diffusers.utils import load_image
 from modules.util.utilities import clear_previous_model_memory
 from modules.util.appstate import state_manager
@@ -41,14 +42,14 @@ def random_seed():
     return torch.randint(0, MAX_SEED, (1,)).item()
 
 def get_pipeline(memory_optimization, inference_type, performance_optimization, diff_multi, diff_single):
-    print("----FluxControlPipeline mode: ", memory_optimization, inference_type, performance_optimization, diff_multi, diff_single)
+    print("----FluxPipeline mode: ", memory_optimization, inference_type, performance_optimization, diff_multi, diff_single)
     # If model is already loaded with same configuration, reuse it
     if (modules.util.appstate.global_pipe is not None and 
-        type(modules.util.appstate.global_pipe).__name__ == "FluxControlPipeline" and 
+        (type(modules.util.appstate.global_pipe).__name__ == "FluxControlPipeline" or type(modules.util.appstate.global_pipe).__name__ == "FluxFillPipeline") and 
             modules.util.appstate.global_inference_type == inference_type and 
             modules.util.appstate.global_performance_optimization == performance_optimization and
             modules.util.appstate.global_memory_mode == memory_optimization):
-                print(">>>>Reusing FluxControlPipeline pipe<<<<")
+                print(">>>>Reusing FluxPipeline pipe<<<<")
                 return modules.util.appstate.global_pipe
     else:
         clear_previous_model_memory()
@@ -56,7 +57,24 @@ def get_pipeline(memory_optimization, inference_type, performance_optimization, 
 
     dtype = torch.bfloat16
     precision = get_precision()
-    transformer_repo = f"mit-han-lab/nunchaku-flux.1-canny-dev/svdq-{precision}_r32-flux.1-canny-dev.safetensors"
+    
+    if(inference_type == "Canny"):
+        transformer_repo = f"mit-han-lab/nunchaku-flux.1-canny-dev/svdq-{precision}_r32-flux.1-canny-dev.safetensors"    
+        flux_repo = "black-forest-labs/FLUX.1-Canny-dev"
+        class_name = FluxControlPipeline
+    elif(inference_type == "Depth"):
+        transformer_repo = f"mit-han-lab/nunchaku-flux.1-depth-dev/svdq-{precision}_r32-flux.1-depth-dev.safetensors"    
+        flux_repo = "black-forest-labs/FLUX.1-Depth-dev"
+        class_name = FluxControlPipeline
+    elif(inference_type == "Fill"):
+        transformer_repo = f"mit-han-lab/nunchaku-flux.1-fill-dev/svdq-{precision}_r32-flux.1-fill-dev.safetensors"    
+        flux_repo = "black-forest-labs/FLUX.1-Fill-dev"
+        class_name = FluxFillPipeline
+    else:
+        transformer_repo = ""
+        flux_repo = ""
+        class_name = None
+    
     transformer = NunchakuFluxTransformer2dModel.from_pretrained(
         transformer_repo, 
         offload=True
@@ -68,8 +86,8 @@ def get_pipeline(memory_optimization, inference_type, performance_optimization, 
     text_encoder_2 = NunchakuT5EncoderModel.from_pretrained(
         text_encoder_2_repo,
     )
-    modules.util.appstate.global_pipe = FluxControlPipeline.from_pretrained(
-        "black-forest-labs/FLUX.1-Canny-dev", 
+    modules.util.appstate.global_pipe = class_name.from_pretrained(
+        flux_repo, 
         transformer=transformer,
         text_encoder_2=text_encoder_2,
         torch_dtype=torch.bfloat16
@@ -100,6 +118,7 @@ def generate_images(
     memory_optimization, no_of_images, randomize_seed, input_image, 
     low_threshold, high_threshold, detect_resolution, image_resolution,
     performance_optimization, diff_multi, diff_single, tea_cache_thresh,
+    inference_type, mask_image
 ):
     if modules.util.appstate.global_inference_in_progress == True:
         print(">>>>Inference in progress, can't continue<<<<")
@@ -108,8 +127,9 @@ def generate_images(
     gallery_items = []
 
     try:
+
         # Get pipeline (either cached or newly loaded)
-        pipe = get_pipeline(memory_optimization, "flux.1-dev-canny", performance_optimization, diff_multi, diff_single)
+        pipe = get_pipeline(memory_optimization, inference_type, performance_optimization, diff_multi, diff_single)
 
         progress_bar = gr.Progress(track_tqdm=True)
         def callback_on_step_end(pipe, i, t, callback_kwargs):
@@ -117,15 +137,27 @@ def generate_images(
             return callback_kwargs
         guidance_scale = float(guidance_scale)
         modules.util.appstate.global_inference_in_progress = True
-        control_image = load_image(input_image)
-        processor = CannyDetector()
-        control_image = processor(
-            control_image, 
-            low_threshold=low_threshold, 
-            high_threshold=high_threshold, 
-            detect_resolution=detect_resolution, 
-            image_resolution=image_resolution
-        )
+
+
+        if(inference_type == "Canny"):
+            control_image = load_image(input_image)
+            processor = CannyDetector()
+            control_image = processor(
+                control_image, 
+                low_threshold=low_threshold, 
+                high_threshold=high_threshold, 
+                detect_resolution=detect_resolution, 
+                image_resolution=image_resolution
+            )
+            base_filename = "canny"
+        elif(inference_type == "Depth"):
+            control_image = load_image(input_image)
+            processor = DepthPreprocessor.from_pretrained("LiheYoung/depth-anything-large-hf")
+            control_image = processor(control_image)[0].convert("RGB")
+            base_filename = "depth"
+        elif(inference_type == "Fill"):
+            base_filename = "fill"
+
         # Generate multiple images in a loop
         for img_idx in range(no_of_images):
             
@@ -138,7 +170,6 @@ def generate_images(
             # Prepare inference parameters
 
             inference_params = {
-                "control_image": control_image, 
                 "prompt": prompt,
                 "height": height,
                 "width": width,
@@ -146,8 +177,15 @@ def generate_images(
                 "generator": generator,
                 "callback_on_step_end": callback_on_step_end,
             }
+            if(inference_type == "Fill"):
+                inference_params["image"] = input_image
+                inference_params["mask_image"] = mask_image
+            else:
+                inference_params["control_image"] = control_image
+
             if performance_optimization != "teacache":
                 inference_params["num_inference_steps"] = num_inference_steps
+
             print(f"Generating image {img_idx+1}/{no_of_images} with seed: {current_seed}")
             
             start_time = datetime.now()
@@ -165,11 +203,11 @@ def generate_images(
             
             # Create filename with index
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-            filename = f"{timestamp}_flux_canny_{img_idx+1}.png"
+            filename = f"{timestamp}_flux_{base_filename}_{img_idx+1}.png"
             output_path = os.path.join(OUTPUT_DIR, filename)
             
             metadata = {
-                "model": "FLUX.1-dev-canny",
+                "model": inference_type,
                 "prompt": prompt,
                 "seed": current_seed,
                 "guidance_scale": f"{float(guidance_scale):.2f}",
@@ -188,7 +226,7 @@ def generate_images(
             print(f"Image {img_idx+1}/{no_of_images} generated: {output_path}")
             
             # Add to gallery items
-            gallery_items.append((output_path, "FLUX.1-dev-canny"))
+            gallery_items.append((output_path, f"FLUX.1-dev-{inference_type}"))
 
         modules.util.appstate.global_inference_in_progress = False
         return gallery_items
@@ -196,18 +234,25 @@ def generate_images(
         print(f"Error during inference: {str(e)}")
         return None
     finally:
-        del control_image
-        del processor
-        gc.collect()
+        if inference_type in ["Canny", "Depth"]:
+            del control_image
+            del processor
+            gc.collect()
         modules.util.appstate.global_inference_in_progress = False
 
 def create_flux_canny_tab():
     gr.HTML("<style>.small-button { max-width: 2.2em; min-width: 2.2em !important; height: 2.4em; align-self: end; line-height: 1em; border-radius: 0.5em; }</style>", visible=False)
-    initial_state = state_manager.get_state("flux-canny") or {}
+    initial_state = state_manager.get_state("flux-canny_depth") or {}
     selected_perf_opt = initial_state.get("performance_optimization", "no_optimization")
     with gr.Row():
-        with gr.Accordion("Optimizations", open=False):
+        with gr.Accordion("Inference type / Optimizations", open=True):
             with gr.Row():
+                flux_inference_type = gr.Radio(
+                    choices=["Canny", "Depth", "Fill"],
+                    label="Inference type",
+                    value=initial_state.get("inference_type", "Canny"),
+                    interactive=True
+                )
                 flux_memory_optimization = gr.Radio(
                     choices=["No optimization", "Extremely Low VRAM"],
                     label="Memory Optimization",
@@ -268,7 +313,7 @@ def create_flux_canny_tab():
     with gr.Row():
         with gr.Column():
             with gr.Row():
-                flux_input_image = gr.Image(label="Input Image", type="pil")
+                flux_input_image = gr.Image(label="Input Image", type="pil", width=512, height=512)
             with gr.Row():
                 flux_low_threshold_slider = gr.Slider(
                     label="Low threshold", 
@@ -276,7 +321,8 @@ def create_flux_canny_tab():
                     maximum=200, 
                     value=50,
                     step=1,
-                    interactive=True
+                    interactive=True,
+                    visible = initial_state.get("inference_type", "Canny") == "Canny"
                 )
             with gr.Row():
                 flux_high_threshold_slider = gr.Slider(
@@ -285,18 +331,29 @@ def create_flux_canny_tab():
                     maximum=200, 
                     value=200,
                     step=1,
-                    interactive=True
+                    interactive=True,
+                    visible = initial_state.get("inference_type", "Canny") == "Canny"
                 )
             with gr.Row():
                 flux_detect_resolution_input = gr.Number(
                     label="Detect resolution", 
                     value=1024,
-                    interactive=True
+                    interactive=True,
+                    visible = initial_state.get("inference_type", "Canny") == "Canny"
                 )
                 flux_image_resolution_input = gr.Number(
                     label="Image resolution", 
                     value=1024,
-                    interactive=True
+                    interactive=True,
+                    visible = initial_state.get("inference_type", "Canny") == "Canny"
+                )
+            with gr.Row():
+                flux_mask_image = gr.Image(
+                    label="Mask Image", 
+                    type="pil",
+                    width=512,
+                    height=512,
+                    visible = initial_state.get("inference_type", "Canny") == "Fill"
                 )
         with gr.Column():
             with gr.Row():
@@ -389,7 +446,7 @@ def create_flux_canny_tab():
     )
 
     def save_current_state(memory_optimization, width, height, guidance_scale, inference_steps,  
-                          no_opt, nunchaku, double_cache, teacache, diff_multi, diff_single, tea_cache_thresh):
+        no_opt, nunchaku, double_cache, teacache, diff_multi, diff_single, tea_cache_thresh, inference_type):
        
         performance_optimization = "no_optimization"
         if nunchaku:
@@ -400,6 +457,7 @@ def create_flux_canny_tab():
             performance_optimization = "teacache"
         
         state_dict = {
+            "inference_type":inference_type, 
             "memory_optimization": memory_optimization,
             "performance_optimization": performance_optimization,
             "width": width,
@@ -411,10 +469,15 @@ def create_flux_canny_tab():
             "tea_cache_threshold": tea_cache_thresh,
         }
         
-        state_manager.save_state("flux-canny", state_dict)
+        state_manager.save_state("flux-canny_depth", state_dict)
         return (memory_optimization, width, height, guidance_scale, inference_steps,  
-                no_opt, nunchaku, double_cache, teacache, diff_multi, diff_single, tea_cache_thresh)
-    
+                no_opt, nunchaku, double_cache, teacache, diff_multi, diff_single, 
+                tea_cache_thresh, inference_type)
+
+    def toggle_visibility(inference_type):
+        return gr.update(visible=(inference_type == "Canny")), gr.update(visible=(inference_type == "Canny")), gr.update(visible=(inference_type == "Canny")), gr.update(visible=(inference_type == "Canny")), gr.update(visible=(inference_type == "Fill"))
+    flux_inference_type.change(toggle_visibility, inputs=[flux_inference_type], outputs=[flux_low_threshold_slider, flux_high_threshold_slider, flux_detect_resolution_input, flux_image_resolution_input, flux_mask_image])
+
     # Event handlers
     random_button.click(fn=random_seed, outputs=[seed_input])
     save_state_button.click(
@@ -432,6 +495,7 @@ def create_flux_canny_tab():
             flux_diff_multi,
             flux_diff_single,
             flux_tea_cache_l1_thresh_slider,
+            flux_inference_type
         ],
         outputs=[
             flux_memory_optimization, 
@@ -446,6 +510,7 @@ def create_flux_canny_tab():
             flux_diff_multi,
             flux_diff_single,
             flux_tea_cache_l1_thresh_slider,
+            flux_inference_type
         ]
     )
     def generate_with_performance_opts(
@@ -454,7 +519,7 @@ def create_flux_canny_tab():
         input_image, low_threshold_slider, high_threshold_slider, 
         detect_resolution, image_resolution,
         no_opt, nunchaku, double_cache, teacache, diff_multi, diff_single, 
-        tea_cache_thresh,
+        tea_cache_thresh, inference_type, mask_image
     ):
      
         if nunchaku:
@@ -472,6 +537,7 @@ def create_flux_canny_tab():
             input_image, low_threshold_slider, high_threshold_slider, 
             detect_resolution, image_resolution,
             performance_optimization, diff_multi, diff_single, tea_cache_thresh,
+            inference_type, mask_image
         )
     generate_button.click(
         fn=generate_with_performance_opts,
@@ -482,7 +548,7 @@ def create_flux_canny_tab():
             flux_input_image, flux_low_threshold_slider, flux_high_threshold_slider, 
             flux_detect_resolution_input, flux_image_resolution_input,
             flux_no_optimization, flux_nunchaku_fp16, flux_double_cache, flux_teacache, flux_diff_multi, flux_diff_single, 
-            flux_tea_cache_l1_thresh_slider,
+            flux_tea_cache_l1_thresh_slider, flux_inference_type, flux_mask_image
         ],
         outputs=[output_gallery]
     )

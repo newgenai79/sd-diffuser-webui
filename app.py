@@ -158,12 +158,8 @@ with gr.Blocks() as dwebui:
             with gr.Tabs():
                 with gr.Tab("Flux.1 Dev"):
                     create_flux_dev_tab()
-                with gr.Tab("Flux.1 Dev - Canny"):
+                with gr.Tab("Flux.1 Dev - Canny / Depth / Fill"):
                     create_flux_canny_tab()
-                with gr.Tab("Flux.1 Dev - Depth"):
-                    create_flux_depth_tab()
-                with gr.Tab("Flux.1 Dev - Fill"):
-                    create_flux_fill_tab()
                 with gr.Tab("Flux.1 Dev - Redux"):
                     create_flux_redux_tab()
                 with gr.Tab("Flux.1 Schnell"):
