@@ -40,14 +40,14 @@ def random_seed():
     return torch.randint(0, MAX_SEED, (1,)).item()
 
 def get_pipeline(model_type, memory_optimization, selected_loras, bypass_token_limit, performance_optimization, diff_multi, diff_single):
-    print("----Flux-dev mode: ", model_type, memory_optimization, selected_loras, bypass_token_limit, performance_optimization, diff_multi, diff_single)
+    print(f"----{model_type} mode: ", model_type, memory_optimization, selected_loras, bypass_token_limit, performance_optimization, diff_multi, diff_single)
     if (modules.util.appstate.global_pipe is not None and 
         type(modules.util.appstate.global_pipe).__name__ == "FluxPipeline" and 
         modules.util.appstate.global_model_type == model_type and
         modules.util.appstate.global_bypass_token_limit == bypass_token_limit and 
         modules.util.appstate.global_performance_optimization == performance_optimization and
         modules.util.appstate.global_memory_mode == memory_optimization):
-        print(">>>>Reusing Flux Dev pipe<<<<")
+        print(">>>>Reusing Flux pipe<<<<")
         if selected_loras != modules.util.appstate.global_selected_lora and hasattr(modules.util.appstate.global_pipe.transformer, "reset_lora"):
             print("Unloading lora....")
             modules.util.appstate.global_pipe.transformer.reset_lora()
@@ -69,9 +69,14 @@ def get_pipeline(model_type, memory_optimization, selected_loras, bypass_token_l
         clear_previous_model_memory()
         torch.cuda.synchronize()
     precision = get_precision()
-    transformer_repo = f"mit-han-lab/nunchaku-flux.1-dev/svdq-{precision}_r32-flux.1-dev.safetensors"
+    if model_type == "FLUX.1-dev":
+        transformer_repo = f"mit-han-lab/nunchaku-flux.1-dev/svdq-{precision}_r32-flux.1-dev.safetensors"
+        bfl_repo = "black-forest-labs/FLUX.1-dev"
+    elif model_type == "FLUX.1-schnell":
+        transformer_repo = f"mit-han-lab/nunchaku-flux.1-schnell/svdq-{precision}_r32-flux.1-schnell.safetensors"
+        bfl_repo = "black-forest-labs/FLUX.1-schnell"
     text_encoder_2_repo = f"mit-han-lab/nunchaku-t5/awq-int4-flux.1-t5xxl.safetensors"
-    bfl_repo = "black-forest-labs/FLUX.1-dev"
+
     dtype = torch.bfloat16
 
     transformer = NunchakuFluxTransformer2dModel.from_pretrained(
@@ -141,12 +146,12 @@ def generate_images(
     num_inference_steps, memory_optimization, 
     no_of_images, randomize_seed, lora_selections, 
     bypass_token_limit, negative_prompt,
-    performance_optimization, diff_multi, diff_single, tea_cache_thresh
+    performance_optimization, diff_multi, diff_single, tea_cache_thresh, model_type
 ):
     if modules.util.appstate.global_inference_in_progress == True:
         print(">>>>Inference in progress, can't continue<<<<")
         return None
-    model_type = "FLUX.1-dev"
+    # model_type = "FLUX.1-dev"
     gallery_items = []
     # Create composed_lora from selected LoRAs and weights
     selected_loras = [(os.path.join(lora_path, lora), float(weight)) for lora, weight in lora_selections.items() if lora]
@@ -160,9 +165,15 @@ def generate_images(
             progress_bar(i / num_inference_steps, desc=f"Generating image {img_idx+1}: (Step {i}/{num_inference_steps})")
             return callback_kwargs
         guidance_scale = float(guidance_scale)
+        
         if bypass_token_limit:
+            if model_type == "FLUX.1-dev":
+                bfl_repo = "black-forest-labs/FLUX.1-dev"
+            elif model_type == "FLUX.1-schnell":
+                bfl_repo = "black-forest-labs/FLUX.1-schnell"
+
             text_pipeline = FluxPipeline.from_pretrained(
-                "black-forest-labs/FLUX.1-dev",
+                bfl_repo,
                 text_encoder_2=text_encoder_2,
                 transformer=None,
                 vae=None,
@@ -218,7 +229,12 @@ def generate_images(
             generation_time = (end_time - start_time).total_seconds()
             os.makedirs(OUTPUT_DIR, exist_ok=True)
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-            filename = f"{timestamp}_flux_dev_{img_idx+1}.png"
+            if model_type == "FLUX.1-dev":
+                base_filename = "dev"
+            elif model_type == "FLUX.1-schnell":
+                base_filename = "schnell"
+
+            filename = f"{timestamp}_flux_{base_filename}_{img_idx+1}.png"
             output_path = os.path.join(OUTPUT_DIR, filename)
             metadata = {
                 "model": model_type,
@@ -257,12 +273,19 @@ def generate_images(
 
 def create_flux_dev_tab():
     gr.HTML("<style>.small-button { max-width: 2.2em; min-width: 2.2em !important; height: 2.4em; align-self: end; line-height: 1em; border-radius: 0.5em; }</style>", visible=False)
-    initial_state = state_manager.get_state("flux-dev") or {}
+    initial_state = state_manager.get_state("flux-dev_schnell") or {}
     selected_perf_opt = initial_state.get("performance_optimization", "no_optimization")
     
     with gr.Row():
-        with gr.Accordion("Optimizations", open=False):
+        with gr.Accordion("Select model / Optimization", open=True):
             with gr.Row():
+                flux_model_type = gr.Dropdown(
+                    choices=["FLUX.1-dev", "FLUX.1-schnell"],
+                    value=initial_state.get("model_type", "FLUX.1-dev"),
+                    label="Select model",
+                    interactive=True,
+                    visible=True
+                )
                 flux_memory_optimization = gr.Radio(
                     choices=["No optimization", "Extremely Low VRAM"],
                     label="Memory Optimization",
@@ -477,7 +500,7 @@ def create_flux_dev_tab():
     )
     """
     def save_current_state(memory_optimization, width, height, guidance_scale, inference_steps, bypass_token_limit, 
-                          no_opt, nunchaku, double_cache, teacache, diff_multi, diff_single, tea_cache_thresh, *lora_inputs):
+                          no_opt, nunchaku, double_cache, teacache, diff_multi, diff_single, tea_cache_thresh, model_type, *lora_inputs):
         # Split lora_inputs into checkboxes and weights
         lora_files = get_lora_files()
         lora_checkboxes_vals = lora_inputs[:len(lora_files)]
@@ -493,6 +516,7 @@ def create_flux_dev_tab():
             performance_optimization = "teacache"
         
         state_dict = {
+            "model_type": model_type,
             "memory_optimization": memory_optimization,
             "performance_optimization": performance_optimization,
             "width": width,
@@ -506,9 +530,9 @@ def create_flux_dev_tab():
             "lora_selections": lora_selections
         }
         
-        state_manager.save_state("flux-dev", state_dict)
+        state_manager.save_state("flux-dev_schnell", state_dict)
         return (memory_optimization, width, height, guidance_scale, inference_steps, bypass_token_limit, 
-                no_opt, nunchaku, double_cache, teacache, diff_multi, diff_single, tea_cache_thresh) + lora_inputs
+                no_opt, nunchaku, double_cache, teacache, diff_multi, diff_single, tea_cache_thresh, model_type) + lora_inputs
 
     random_button.click(fn=random_seed, outputs=[seed_input])
     
@@ -528,6 +552,7 @@ def create_flux_dev_tab():
             flux_diff_multi,
             flux_diff_single,
             flux_tea_cache_l1_thresh_slider,
+            flux_model_type,
             *lora_checkboxes.values(),
             *lora_weights.values()
         ],
@@ -545,6 +570,7 @@ def create_flux_dev_tab():
             flux_diff_multi,
             flux_diff_single,
             flux_tea_cache_l1_thresh_slider,
+            flux_model_type,
             *lora_checkboxes.values(),
             *lora_weights.values()
         ]
@@ -555,7 +581,7 @@ def create_flux_dev_tab():
         flux_guidance_scale_slider, flux_num_inference_steps_input, flux_memory_optimization, 
         flux_no_of_images_input, flux_randomize_seed, 
         flux_bypass_token_limit, flux_negative_prompt_input,
-        no_opt, nunchaku, double_cache, teacache, diff_multi, diff_single, tea_cache_thresh,
+        no_opt, nunchaku, double_cache, teacache, diff_multi, diff_single, tea_cache_thresh, model_type, 
         *lora_inputs
     ):
         lora_files = get_lora_files()
@@ -577,7 +603,7 @@ def create_flux_dev_tab():
             flux_guidance_scale_slider, flux_num_inference_steps_input, flux_memory_optimization,
             flux_no_of_images_input, flux_randomize_seed, lora_selections,
             flux_bypass_token_limit, flux_negative_prompt_input,
-            performance_optimization, diff_multi, diff_single, tea_cache_thresh
+            performance_optimization, diff_multi, diff_single, tea_cache_thresh, model_type
         )
 
     generate_button.click(
@@ -589,7 +615,7 @@ def create_flux_dev_tab():
             flux_no_of_images_input, flux_randomize_seed, 
             flux_bypass_token_limit, flux_negative_prompt_input,
             flux_no_optimization, flux_nunchaku_fp16, flux_double_cache, flux_teacache,
-            flux_diff_multi, flux_diff_single, flux_tea_cache_l1_thresh_slider,
+            flux_diff_multi, flux_diff_single, flux_tea_cache_l1_thresh_slider, flux_model_type, 
             *lora_checkboxes.values(),
             *lora_weights.values()
         ],

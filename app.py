@@ -25,7 +25,6 @@ from modules.text2image.tab_sd35_medium_swd_gguf import create_sd35_medium_swd_g
 
 # SVDQuant
 from modules.svdquant.tab_flux_dev import create_flux_dev_tab
-from modules.svdquant.tab_flux_schnell import create_flux_schnell_tab
 from modules.svdquant.tab_flux_shuttle_jaguar import create_shuttle_jaguar_tab
 from modules.svdquant.tab_flux_canny_dev import create_flux_canny_tab
 from modules.svdquant.tab_flux_redux_dev import create_flux_redux_tab
@@ -160,8 +159,6 @@ with gr.Blocks() as dwebui:
                     create_flux_canny_tab()
                 with gr.Tab("Flux.1 Dev - Redux"):
                     create_flux_redux_tab()
-                with gr.Tab("Flux.1 Schnell"):
-                    create_flux_schnell_tab()
                 with gr.Tab("Shuttle jaguar"):
                     create_shuttle_jaguar_tab()
         with gr.Tab("Video generation"):
