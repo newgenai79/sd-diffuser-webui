@@ -75,6 +75,10 @@ def get_pipeline(model_type, memory_optimization, selected_loras, bypass_token_l
     elif model_type == "FLUX.1-schnell":
         transformer_repo = f"mit-han-lab/nunchaku-flux.1-schnell/svdq-{precision}_r32-flux.1-schnell.safetensors"
         bfl_repo = "black-forest-labs/FLUX.1-schnell"
+    elif model_type == "Shuttle-jaguar":
+        transformer_repo = f"mit-han-lab/nunchaku-shuttle-jaguar/svdq-{precision}_r32-shuttle-jaguar.safetensors"
+        bfl_repo = "shuttleai/shuttle-jaguar"       
+
     text_encoder_2_repo = f"mit-han-lab/nunchaku-t5/awq-int4-flux.1-t5xxl.safetensors"
 
     dtype = torch.bfloat16
@@ -171,7 +175,8 @@ def generate_images(
                 bfl_repo = "black-forest-labs/FLUX.1-dev"
             elif model_type == "FLUX.1-schnell":
                 bfl_repo = "black-forest-labs/FLUX.1-schnell"
-
+            elif model_type == "Shuttle-jaguar":
+                bfl_repo = "shuttleai/shuttle-jaguar"
             text_pipeline = FluxPipeline.from_pretrained(
                 bfl_repo,
                 text_encoder_2=text_encoder_2,
@@ -233,7 +238,8 @@ def generate_images(
                 base_filename = "dev"
             elif model_type == "FLUX.1-schnell":
                 base_filename = "schnell"
-
+            elif model_type == "Shuttle-jaguar":
+                base_filename = "shuttle_jaguar"
             filename = f"{timestamp}_flux_{base_filename}_{img_idx+1}.png"
             output_path = os.path.join(OUTPUT_DIR, filename)
             metadata = {
@@ -280,7 +286,7 @@ def create_flux_dev_tab():
         with gr.Accordion("Select model / Optimization", open=True):
             with gr.Row():
                 flux_model_type = gr.Dropdown(
-                    choices=["FLUX.1-dev", "FLUX.1-schnell"],
+                    choices=["FLUX.1-dev", "FLUX.1-schnell", "Shuttle-jaguar"],
                     value=initial_state.get("model_type", "FLUX.1-dev"),
                     label="Select model",
                     interactive=True,
