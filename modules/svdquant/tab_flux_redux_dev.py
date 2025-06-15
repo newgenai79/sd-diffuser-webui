@@ -14,6 +14,7 @@ from diffusers import FluxPipeline, FluxPriorReduxPipeline
 from diffusers.utils import load_image
 from modules.util.utilities import clear_previous_model_memory
 from modules.util.appstate import state_manager
+from nunchaku.utils import get_precision
 
 MAX_SEED = np.iinfo(np.int32).max
 OUTPUT_DIR = "output/t2i/Flux"
@@ -37,9 +38,9 @@ def get_pipeline(memory_optimization, inference_type, performance_optimization):
 
     dtype = torch.bfloat16
 
+    precision = get_precision()
     transformer = NunchakuFluxTransformer2dModel.from_pretrained(
-        "mit-han-lab/svdq-int4-flux.1-dev",
-        offload=True
+        f"mit-han-lab/nunchaku-flux.1-dev/svdq-{precision}_r32-flux.1-dev.safetensors"
     )
     if performance_optimization == "nunchaku-fp16":
         transformer.set_attention_impl("nunchaku-fp16")
@@ -48,6 +49,8 @@ def get_pipeline(memory_optimization, inference_type, performance_optimization):
         transformer=transformer,
         text_encoder=None,
         text_encoder_2=None,
+        tokenizer=None,
+        tokenizer_2=None,
         torch_dtype=torch.bfloat16
     )
     if performance_optimization == "apply_cache_on_pipe":

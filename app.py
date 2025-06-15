@@ -152,7 +152,7 @@ with gr.Blocks() as dwebui:
                     create_auraflow_gguf_tab()
         with gr.Tab("SVDQuant - nunchaku"):
             with gr.Tabs():
-                with gr.Tab("Flux.1 Dev"):
+                with gr.Tab("Flux.1 Dev / Schnell / Shuttle-Jaguar"):
                     create_flux_dev_tab()
                 with gr.Tab("Flux.1 Dev - Canny / Depth / Fill"):
                     create_flux_canny_tab()
