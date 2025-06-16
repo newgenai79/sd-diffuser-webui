@@ -27,6 +27,7 @@ from modules.text2image.tab_sd35_medium_swd_gguf import create_sd35_medium_swd_g
 from modules.svdquant.tab_flux_dev import create_flux_dev_tab
 from modules.svdquant.tab_flux_canny_dev import create_flux_canny_tab
 from modules.svdquant.tab_flux_redux_dev import create_flux_redux_tab
+from modules.svdquant.tab_flux_pulid_dev import create_flux_pulid_tab
 
 # Video generation
 from modules.video_generation.tab_ltx095 import create_ltx095_tab
@@ -158,6 +159,8 @@ with gr.Blocks() as dwebui:
                     create_flux_canny_tab()
                 with gr.Tab("Flux.1 Dev - Redux"):
                     create_flux_redux_tab()
+                with gr.Tab("Flux.1 Dev - Pulid"):
+                    create_flux_pulid_tab()
         with gr.Tab("Video generation"):
             with gr.Tabs():
                 with gr.Tab("VACE-Wan2.1-1.3B-Preview"):
