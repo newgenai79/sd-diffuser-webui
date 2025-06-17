@@ -33,3 +33,4 @@ ftfy
 mediapipe
 onnxruntime-gpu
 hf_xet
+xformers
