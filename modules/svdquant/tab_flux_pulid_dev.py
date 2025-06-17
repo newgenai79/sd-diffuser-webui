@@ -142,6 +142,10 @@ def generate_images(
                 "model": "FLUX.1-dev-pulid",
                 "seed": current_seed,
                 "guidance_scale": f"{float(guidance_scale):.2f}",
+                "id_weight": id_weight,
+                "width": width, 
+                "height": height, 
+                "true_cfg_scale": true_cfg_scale,
                 "num_inference_steps": num_inference_steps,
                 "memory_optimization": memory_optimization,
                 "performance_optimization": performance_optimization,
@@ -239,10 +243,10 @@ def create_flux_pulid_tab():
             with gr.Row():
                 flux_id_weight = gr.Slider(
                     label="ID weight", 
-                    minimum=0.1, 
-                    maximum=2.0, 
-                    value=initial_state.get("guidance_scale", 1),
-                    step=0.1,
+                    minimum=0, 
+                    maximum=3.0, 
+                    value=initial_state.get("id_weight", 1),
+                    step=0.05,
                     interactive=True
                 )
             with gr.Row():
@@ -361,7 +365,7 @@ def create_flux_pulid_tab():
     """
     def save_current_state(memory_optimization, guidance_scale, inference_steps, 
             no_opt, nunchaku, double_cache, teacache, diff_multi, diff_single, 
-            tea_cache_thresh, width, height, true_cfg_scale):
+            tea_cache_thresh, width, height, true_cfg_scale, id_weight):
 
         performance_optimization = "no_optimization"
         if nunchaku:
@@ -380,7 +384,8 @@ def create_flux_pulid_tab():
             "tea_cache_threshold": tea_cache_thresh,
             "width": width,
             "height": height,
-            "true_cfg_scale": true_cfg_scale
+            "true_cfg_scale": true_cfg_scale,
+            "id_weight": id_weight
         }
         # print("Saving state:", state_dict)
         initial_state = state_manager.get_state("flux-pulid") or {}
@@ -404,7 +409,8 @@ def create_flux_pulid_tab():
             flux_tea_cache_l1_thresh,
             flux_width, 
             flux_height,
-            flux_true_cfg_scale
+            flux_true_cfg_scale,
+            flux_id_weight
         ],
         outputs=[
             flux_memory_optimization, 
@@ -419,7 +425,8 @@ def create_flux_pulid_tab():
             flux_tea_cache_l1_thresh,
             flux_width, 
             flux_height,
-            flux_true_cfg_scale
+            flux_true_cfg_scale,
+            flux_id_weight
         ]
     )
     def generate_with_performance_opts(

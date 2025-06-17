@@ -350,7 +350,7 @@ def create_flux_dev_tab():
                     )
     
     with gr.Row():
-        flux_bypass_token_limit = gr.Checkbox(label="Bypass 77 tokens limit (consumes more VRAM during text encoding)", value=initial_state.get("bypass_token_limit", False), interactive=True)
+        flux_bypass_token_limit = gr.Checkbox(label="Bypass 77 tokens limit (consumes more VRAM during text encoding) (DO NOT USE WITH SMALL PROMPTS)", value=initial_state.get("bypass_token_limit", False), interactive=True)
     with gr.Row():
         with gr.Column():
             flux_prompt_input = gr.Textbox(
