@@ -28,6 +28,7 @@ from modules.svdquant.tab_flux_dev import create_flux_dev_tab
 from modules.svdquant.tab_flux_canny_dev import create_flux_canny_tab
 from modules.svdquant.tab_flux_redux_dev import create_flux_redux_tab
 from modules.svdquant.tab_flux_pulid_dev import create_flux_pulid_tab
+from modules.svdquant.tab_flux_controlnet_union_pro import create_flux_controlnet_union_pro_tab
 
 # Video generation
 from modules.video_generation.tab_ltx095 import create_ltx095_tab
@@ -161,6 +162,8 @@ with gr.Blocks() as dwebui:
                     create_flux_redux_tab()
                 with gr.Tab("Flux.1 Dev - Pulid"):
                     create_flux_pulid_tab()
+                with gr.Tab("Flux.1 Dev - ControlNet Union Pro"):
+                    create_flux_controlnet_union_pro_tab()                    
         with gr.Tab("Video generation"):
             with gr.Tabs():
                 with gr.Tab("VACE-Wan2.1-1.3B-Preview"):

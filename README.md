@@ -47,6 +47,7 @@
 	<img src='https://img.shields.io/badge/Flux.1_dev_Fill-blue'>
 	<img src='https://img.shields.io/badge/Flux.1_dev_Redux-red'>
 	<a href='https://huggingface.co/shuttleai/shuttle-jaguar'><img src='https://img.shields.io/badge/Shuttle_jaguar-blue'></a>
+	<a href='https://huggingface.co/Shakker-Labs/FLUX.1-dev-ControlNet-Union-Pro'><img src='https://img.shields.io/badge/FLUX.1-dev-ControlNet-Union-Pro-red'></a>
 </div>
 <hr />
 
