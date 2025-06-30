@@ -34,3 +34,4 @@ mediapipe
 onnxruntime-gpu
 hf_xet
 xformers
+easy-dwpose
