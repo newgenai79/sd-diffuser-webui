@@ -34,4 +34,4 @@ mediapipe
 onnxruntime-gpu
 hf_xet
 xformers
-easy-dwpose
+git+https://github.com/newgenai79/easy_dwpose.git
