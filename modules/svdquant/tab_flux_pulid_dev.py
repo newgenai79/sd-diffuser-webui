@@ -276,7 +276,7 @@ def create_flux_pulid_tab():
                 )
             with gr.Row():
                 flux_negative_prompt_input = gr.Textbox(
-                    label="Prompt", 
+                    label="Negative prompt", 
                     lines=2,
                     value="bad quality, worst quality, text, signature, watermark, extra limbs",
                     interactive=True

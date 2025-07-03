@@ -6,6 +6,7 @@ import torch
 import gradio as gr
 import numpy as np
 import os
+import gc
 import modules.util.appstate
 from PIL import Image
 from datetime import datetime
@@ -14,6 +15,8 @@ from diffusers.utils import load_image
 from huggingface_hub import snapshot_download
 from modules.util.utilities import clear_previous_model_memory
 from modules.util.appstate import state_manager
+from sd_embed.embedding_funcs import get_weighted_text_embeddings_flux1
+from transformers import T5EncoderModel
 from controlnet_aux import (
     HEDdetector, 
     LineartDetector, 
@@ -36,7 +39,7 @@ def get_pipeline(memory_optimization, vaetiling, model_type):
         modules.util.appstate.global_inference_type == model_type and 
         modules.util.appstate.global_memory_mode == memory_optimization):
         print(">>>>Reusing Flex.2-preview pipe<<<<")
-        return modules.util.appstate.global_pipe
+        return modules.util.appstate.global_pipe, modules.util.appstate.global_text_encoder_2
     else:
         clear_previous_model_memory()
 
@@ -54,10 +57,20 @@ def get_pipeline(memory_optimization, vaetiling, model_type):
         local_dir=f"{cache_path}/{model_name_or_path}",
         local_dir_use_symlinks=False
     )
-
+    modules.util.appstate.global_text_encoder_2 = AutoPipelineForText2Image.from_pretrained(
+        model_name_or_path,
+        transformer=None,
+        vae=None,
+        torch_dtype=dtype,
+        cache_dir=f"{cache_path}/{model_name_or_path}",
+    )
     modules.util.appstate.global_pipe = AutoPipelineForText2Image.from_pretrained(
         model_name_or_path,
         custom_pipeline=f"{cache_path}/{model_name_or_path}",
+        text_encoder=None,
+        text_encoder_2=None,
+        tokenizer=None,
+        tokenizer_2=None,
         torch_dtype=dtype,
         cache_dir=f"{cache_path}/{model_name_or_path}",
     )
@@ -77,7 +90,8 @@ def get_pipeline(memory_optimization, vaetiling, model_type):
     # Update global variables
     modules.util.appstate.global_memory_mode = memory_optimization
     modules.util.appstate.global_inference_type = model_type
-    return modules.util.appstate.global_pipe
+    # modules.util.appstate.global_text_encoder_2 = text_encoder_2
+    return modules.util.appstate.global_pipe, modules.util.appstate.global_text_encoder_2
 
 def generate_preview_control_image(source_image_path, control_type):
     if not source_image_path:
@@ -90,16 +104,20 @@ def generate_preview_control_image(source_image_path, control_type):
         # Specify custom cache directory for model files
         cache_dir = os.path.join("models", "controlnet")
         os.makedirs(cache_dir, exist_ok=True)
-        
+        device = "cuda" if torch.cuda.is_available() else "cpu"
         # Initialize appropriate detector based on control type
         if control_type == "Line":
             detector = LineartDetector.from_pretrained("lllyasviel/Annotators", cache_dir=cache_dir)
+            detector.to(device)
         elif control_type == "Depth":
             detector = MidasDetector.from_pretrained("lllyasviel/Annotators", cache_dir=cache_dir)
+            detector.to(device)
         elif control_type == "OpenPose":
             detector = OpenposeDetector.from_pretrained("lllyasviel/Annotators", cache_dir=cache_dir)
+            detector.to(device)
         elif control_type == "DWPose":
             detector = DWposeDetector()
+            detector.to(device)
         else:
             print(f"Unsupported control type: {control_type}")
             return None
@@ -119,7 +137,7 @@ def generate_preview_control_image(source_image_path, control_type):
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S_%f")
         control_image_path = os.path.join(control_dir, f"control_{control_type}_{timestamp}.png")
         control_image.save(control_image_path)
-        
+        del detector
         return control_image_path
     except Exception as e:
         print(f"Error generating control image: {str(e)}")
@@ -143,7 +161,8 @@ def generate_images(
     inpaint_control_image, inpaint_mask_image, 
     prompt, width, height, 
     seed, model_type, memory_optimization, vaetiling, guidance_scale, 
-    num_inference_steps, control_strength, control_stop
+    num_inference_steps, control_strength, control_stop,
+    no_of_images, randomize_seed
 ):
     if modules.util.appstate.global_inference_in_progress == True:
         print(">>>>Inference in progress, can't continue<<<<")
@@ -151,20 +170,33 @@ def generate_images(
     modules.util.appstate.global_inference_in_progress = True
     try:
         # Get pipeline (either cached or newly loaded)
-        pipe = get_pipeline(memory_optimization, vaetiling, model_type)
-        generator = torch.Generator(device="cpu").manual_seed(seed)
+        pipe, text_pipeline = get_pipeline(memory_optimization, vaetiling, model_type)
+        # generator = torch.Generator(device="cpu").manual_seed(seed)
         progress_bar = gr.Progress(track_tqdm=True)
         def callback_on_step_end(pipe, i, t, callback_kwargs):
             progress_bar(i / num_inference_steps, desc=f"Generating image (Step {i}/{num_inference_steps})")
             return callback_kwargs
+        # Create output directory if it doesn't exist
+        os.makedirs(OUTPUT_DIR, exist_ok=True)
+        base_filename = "flex2_preview.png"
+        gallery_items = []
+        text_pipeline.to('cuda')
+        with torch.no_grad():
+            prompt_embeds, pooled_prompt_embeds = get_weighted_text_embeddings_flux1(
+                pipe=text_pipeline,
+                prompt=prompt,
+            )
+        text_pipeline.to('cpu')
         # Prepare inference parameters
         inference_params = {
-            "prompt": prompt,
+            # "prompt": prompt,
+            "prompt_embeds": prompt_embeds,
+            "pooled_prompt_embeds": pooled_prompt_embeds,
             "height": height,
             "width": width,
             "guidance_scale": guidance_scale,
             "num_inference_steps": num_inference_steps,
-            "generator": generator,
+            # "generator": generator,
             "callback_on_step_end": callback_on_step_end,
         }
         if inference_type=="Control":
@@ -177,41 +209,44 @@ def generate_images(
             inference_params["control_image"] = load_image(inpaint_control_image)
             inference_params["inpaint_image"] = load_image(inpaint_source_image)
             inference_params["inpaint_mask"] = load_image(inpaint_mask_image)
-        # Generate images
-        start_time = datetime.now()
-        image = pipe(**inference_params).images[0]
-        end_time = datetime.now()
-        generation_time = (end_time - start_time).total_seconds()
-        # Create output directory if it doesn't exist
-        os.makedirs(OUTPUT_DIR, exist_ok=True)
-        
-        base_filename = "flex2_preview.png"
-        
-        gallery_items = []
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-        filename = f"{timestamp}_{base_filename}"
-        output_path = os.path.join(OUTPUT_DIR, filename)
-        metadata = {
-            "model": "Flex.2-preview",
-            "prompt": prompt,
-            "seed": seed,
-            "guidance_scale": guidance_scale,
-            "num_inference_steps": num_inference_steps,
-            "width": width,
-            "height": height,
-            "memory_optimization": memory_optimization,
-            "vae_tiling": vaetiling,
-            "timestamp": timestamp,
-            "generation_time": generation_time
-        }
-        # Save the image
-        image.save(output_path)
-        modules.util.utilities.save_metadata_to_file(output_path, metadata)
-        print(f"Image generated: {output_path}")
-        modules.util.appstate.global_inference_in_progress = False
-        # Add to gallery items
-        gallery_items.append((output_path, "Flex.2-preview"))
-        
+
+        for img_idx in range(no_of_images):
+            current_seed = random_seed() if randomize_seed else seed
+            generator = torch.Generator(device="cpu").manual_seed(current_seed)
+            inference_params["generator"] = generator
+            # Generate images
+            start_time = datetime.now()
+            image = pipe(**inference_params).images[0]
+            end_time = datetime.now()
+            generation_time = (end_time - start_time).total_seconds()
+           
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+            filename = f"{timestamp}_{base_filename}"
+            output_path = os.path.join(OUTPUT_DIR, filename)
+            metadata = {
+                "model": "Flex.2-preview",
+                "prompt": prompt,
+                "seed": seed,
+                "guidance_scale": guidance_scale,
+                "num_inference_steps": num_inference_steps,
+                "width": width,
+                "height": height,
+                "memory_optimization": memory_optimization,
+                "vae_tiling": vaetiling,
+                "timestamp": timestamp,
+                "generation_time": generation_time
+            }
+            # Save the image
+            image.save(output_path)
+            modules.util.utilities.save_metadata_to_file(output_path, metadata)
+            print(f"Image {img_idx+1}/{no_of_images} generated: {output_path}")
+            # Add to gallery items
+            gallery_items.append((output_path, "Flex.2-preview"))
+        del prompt_embeds
+        del pooled_prompt_embeds
+        gc.collect()
+        torch.cuda.empty_cache()
+        modules.util.appstate.global_inference_in_progress = False        
         return gallery_items
 
     except Exception as e:
@@ -291,14 +326,7 @@ def create_flex2_preview_tab():
             justify-content: flex-start !important; /* Align content to the left */
             align-items: center !important; /* Keep vertical centering if needed */
         }
-        .debug-row {
-            border: 2px solid red !important; /* Red border for the row */
-            padding: 5px !important; /* Optional: Add padding to see the border clearly */
-        }
-        .debug-column {
-            border: 2px solid blue !important; /* Blue border for the column */
-            padding: 5px !important; /* Optional: Add padding to see the border clearly */
-        }
+        .center-button-container { display: flex !important; align-items: center !important; justify-content: center !important; height: 512px !important; width: 100% !important; }
         </style>
     """, visible=False)
     initial_state = state_manager.get_state("flex2_preview") or {}
@@ -357,7 +385,7 @@ def create_flex2_preview_tab():
             with gr.Row():
                 with gr.Column():
                     flex2_preview_inpaint_mask_editor = gr.ImageEditor(image_mode="RGBA", type="numpy", brush=brush, sources="upload", width=512, height=512, interactive=True)
-                with gr.Column(scale=1, elem_classes=["debug-column"]):
+                with gr.Column(scale=1, elem_classes=["center-button-container"]):
                     preview_button_inpaint_mask = gr.Button("👁️", elem_classes="small-button", interactive=False)
                 with gr.Column():
                     flex2_preview_inpaint_mask_image = gr.Image(label="Inpaint mask image", type="filepath", width=512, height=512, interactive=False)
@@ -382,6 +410,14 @@ def create_flex2_preview_tab():
                 )
                 seed = gr.Number(label="Seed", value=0, minimum=0, maximum=MAX_SEED, interactive=True)
                 random_button = gr.Button("🔄", elem_classes="small-button")
+            with gr.Row():
+                flex2_preview_no_of_images = gr.Number(
+                    label="Number of Images", 
+                    value=1,
+                    interactive=True
+                )
+                flex2_preview_randomize_seed = gr.Checkbox(label="Randomize seed", value=False, interactive=True)
+
         with gr.Column():
             with gr.Row():
                 flex2_preview_model_type = gr.Radio(
@@ -492,7 +528,7 @@ def create_flex2_preview_tab():
             flex2_preview_model_type, flex2_preview_memory_optimization, 
             flex2_preview_vaetiling, flex2_preview_guidance_scale, 
             flex2_preview_num_inference_steps, flex2_preview_control_strength, 
-            flex2_preview_control_stop
+            flex2_preview_control_stop, flex2_preview_no_of_images, flex2_preview_randomize_seed
         ],
         outputs=[output_gallery]
     )

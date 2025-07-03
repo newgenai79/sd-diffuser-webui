@@ -43,7 +43,8 @@ def get_pipeline(memory_optimization, inference_type, performance_optimization, 
 
     precision = get_precision()
     transformer = NunchakuFluxTransformer2dModel.from_pretrained(
-        f"mit-han-lab/nunchaku-flux.1-dev/svdq-{precision}_r32-flux.1-dev.safetensors"
+        f"mit-han-lab/nunchaku-flux.1-dev/svdq-{precision}_r32-flux.1-dev.safetensors", 
+        offload=True
     )
     if performance_optimization == "nunchaku-fp16":
         transformer.set_attention_impl("nunchaku-fp16")

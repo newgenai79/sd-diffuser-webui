@@ -8,6 +8,15 @@ import piexif
 import piexif.helper
 from pathlib import Path
 
+def clear_controlnet_model_memory():
+    print(">>>>clear_controlnet_model_memory<<<<")
+    del modules.util.appstate.global_controlnet_model
+    modules.util.appstate.global_controlnet_model = None
+    gc.collect()
+    torch.cuda.empty_cache()
+    torch.cuda.ipc_collect()
+    torch.cuda.synchronize()
+
 def clear_previous_model_memory():
 
     if modules.util.appstate.global_pipe is not None:
@@ -47,8 +56,13 @@ def clear_previous_model_memory():
     modules.util.appstate.global_bypass_token_limit = None
     del modules.util.appstate.global_text_encoder_2
     modules.util.appstate.global_text_encoder_2 = None
+    del modules.util.appstate.global_controlnet
+    modules.util.appstate.global_controlnet = None
+    del modules.util.appstate.global_controlnet_model
+    modules.util.appstate.global_controlnet_model = None
     modules.util.appstate.global_performance_optimization = None
     modules.util.appstate.global_model_manager = None
+    modules.util.appstate.global_use_qencoder = None
     # Force garbage collection and CUDA memory cleanup
     gc.collect()
     torch.cuda.empty_cache()
