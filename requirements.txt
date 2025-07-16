@@ -4,7 +4,7 @@ torchvision
 torchaudio
 transformers>=4.49.0
 sentencepiece>=0.1.96
-huggingface-hub
+huggingface-hub>=0.30.0
 einops
 opencv-python
 imageio
@@ -25,6 +25,7 @@ piexif
 modelscope
 safetensors
 git+https://github.com/huggingface/controlnet_aux.git
+git+https://github.com/huggingface/image_gen_aux.git
 cupy-cuda12x
 git+https://github.com/XPixelGroup/BasicSR.git
 realesrgan
@@ -35,3 +36,4 @@ onnxruntime-gpu
 hf_xet
 xformers
 git+https://github.com/newgenai79/easy_dwpose.git
+loadimg

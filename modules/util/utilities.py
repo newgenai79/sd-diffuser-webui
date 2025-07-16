@@ -20,30 +20,31 @@ def clear_controlnet_model_memory():
 def clear_previous_model_memory():
 
     if modules.util.appstate.global_pipe is not None:
-        print(">>>>clear_previous_model_memory: Removing model from memory<<<<")
-        
-        # Remove hooks if present
-        if hasattr(modules.util.appstate.global_pipe, 'remove_all_hooks'):
-            modules.util.appstate.global_pipe.remove_all_hooks()
-        
-        # Explicitly delete model components
-        if modules.util.appstate.global_model_manager is None:
-            if hasattr(modules.util.appstate.global_pipe, '__dict__'):
-                for attr_name, attr_value in list(modules.util.appstate.global_pipe.__dict__.items()):
-                    if hasattr(attr_value, 'to'):
-                        try:
-                            attr_value.to("cpu")  # Move to CPU to free VRAM
-                        except:
-                            pass
-                    delattr(modules.util.appstate.global_pipe, attr_name)
-        if modules.util.appstate.global_model_manager is not None:
-            del modules.util.appstate.global_model_manager
+        print(">>>>clear_previous_model_memory: Removing model from memory<<<<", type(modules.util.appstate.global_pipe).__name__)
+        if type(modules.util.appstate.global_pipe).__name__ != "BiRefNet":
+            # Remove hooks if present
+            if hasattr(modules.util.appstate.global_pipe, 'remove_all_hooks'):
+                modules.util.appstate.global_pipe.remove_all_hooks()
+            
+            # Explicitly delete model components
+            if modules.util.appstate.global_model_manager is None:
+                if hasattr(modules.util.appstate.global_pipe, '__dict__'):
+                    for attr_name, attr_value in list(modules.util.appstate.global_pipe.__dict__.items()):
+                        if hasattr(attr_value, 'to'):
+                            try:
+                                attr_value.to("cpu")  # Move to CPU to free VRAM
+                            except:
+                                pass
+                        delattr(modules.util.appstate.global_pipe, attr_name)
+            if modules.util.appstate.global_model_manager is not None:
+                del modules.util.appstate.global_model_manager
         # Delete the pipeline
     del modules.util.appstate.global_pipe
         
     # Reset all global state variables
     modules.util.appstate.global_pipe = None
     modules.util.appstate.global_memory_mode = None
+    del modules.util.appstate.global_inference_type
     modules.util.appstate.global_inference_type = None
     modules.util.appstate.global_model_type = None
     modules.util.appstate.global_quantization = None

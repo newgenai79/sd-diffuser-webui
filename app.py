@@ -46,6 +46,7 @@ from modules.image2video.tab_ltximage2video091 import create_ltximage2video091_t
 # Extras
 from modules.extras.tab_omnigen import create_omnigen_tab
 from modules.extras.tab_video_upscale import create_video_upscaler_interface
+from modules.extras.tab_birefnet import create_birefnet_tab
 
 # Import utilities for metadata handling
 from modules.util.utilities import read_metadata_from_file
@@ -190,6 +191,8 @@ with gr.Blocks() as dwebui:
                     create_omnigen_tab()
                 with gr.Tab("Video upscaler"):
                     create_video_upscaler_interface()
+                with gr.Tab("BiRefNet"):
+                    create_birefnet_tab()
         with gr.Tab("Info"):
             create_info_tab()
 

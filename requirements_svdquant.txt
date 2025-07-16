@@ -1,5 +1,5 @@
-https://github.com/mit-han-lab/nunchaku/releases/download/v0.3.2dev20250701/nunchaku-0.3.2.dev20250701+torch2.7-cp311-cp311-win_amd64.whl; platform_system == "Windows" and python_version == "3.11"
-https://github.com/mit-han-lab/nunchaku/releases/download/v0.3.2dev20250701/nunchaku-0.3.2.dev20250701+torch2.7-cp311-cp311-linux_x86_64.whl; platform_system == "Linux" and python_version == "3.11"
+https://github.com/mit-han-lab/nunchaku/releases/download/v0.3.2dev20250715/nunchaku-0.3.2.dev20250715+torch2.7-cp311-cp311-win_amd64.whl; platform_system == "Windows" and python_version == "3.11"
+https://github.com/mit-han-lab/nunchaku/releases/download/v0.3.2dev20250715/nunchaku-0.3.2.dev20250715+torch2.7-cp311-cp311-linux_x86_64.whl; platform_system == "Linux" and python_version == "3.11"
 git+https://github.com/asomoza/image_gen_aux.git
 git+https://github.com/xhinker/sd_embed.git@main
 insightface
