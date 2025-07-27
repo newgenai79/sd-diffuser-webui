@@ -40,12 +40,14 @@ def common_setup(w, h):
     ])
 
 def rgba_to_hex(rgba_str):
-    """Convert rgba(r, g, b, a) string to #RRGGBBAA hex format."""
+    """Convert rgba(r, g, b, a) string to #RRGGBBAA hex format, handling integer or float RGB values."""
     try:
-        match = re.match(r'rgba\((\d+),\s*(\d+),\s*(\d+),\s*([0-1](\.\d+)?)\)', rgba_str)
+        # Updated regex to match integers or floating-point numbers for RGB, and 0-1 for alpha
+        match = re.match(r'rgba\((\d*\.?\d+),\s*(\d*\.?\d+),\s*(\d*\.?\d+),\s*([0-1](\.\d+)?)\)', rgba_str)
         if not match:
             raise ValueError(f"Invalid rgba format: {rgba_str}")
-        r, g, b, a = int(match.group(1)), int(match.group(2)), int(match.group(3)), float(match.group(4))
+        # Round RGB values to nearest integer, parse alpha as float
+        r, g, b, a = round(float(match.group(1))), round(float(match.group(2))), round(float(match.group(3))), float(match.group(4))
         if not (0 <= r <= 255 and 0 <= g <= 255 and 0 <= b <= 255 and 0 <= a <= 1):
             raise ValueError(f"RGBA values out of range: {rgba_str}")
         a = int(a * 255)
@@ -57,47 +59,52 @@ def get_timestamp():
     return datetime.now().strftime("%d%m%Y%H%M%S")
 
 def process(image, save_flat, bg_colour, model_name):
-    # try:
-    get_pipeline(model_name)
-    global transform_image
-    if isinstance(image, str):
-        input_filename = pathlib.Path(image).stem + f"_{get_timestamp()}"
-    else:
-        input_filename = get_timestamp()
+    if modules.util.appstate.global_inference_in_progress == True:
+        print(">>>>Inference in progress, can't continue<<<<")
+        return None
+    modules.util.appstate.global_inference_in_progress = True
+    try:
+        get_pipeline(model_name)
+        global transform_image
+        if isinstance(image, str):
+            input_filename = pathlib.Path(image).stem + f"_{get_timestamp()}"
+        else:
+            input_filename = get_timestamp()
 
-    im = load_img(image, output_type="pil",input_type="auto").convert("RGB")
-    image_size = im.size
-    image = load_img(im, output_type="pil",input_type="auto")
-    input_image = transform_image(image).unsqueeze(0).to(torch.device("cuda" if torch.cuda.is_available() else "cpu")).to(torch.float16)
+        im = load_img(image, output_type="pil",input_type="auto").convert("RGB")
+        image_size = im.size
+        image = load_img(im, output_type="pil",input_type="auto")
+        input_image = transform_image(image).unsqueeze(0).to(torch.device("cuda" if torch.cuda.is_available() else "cpu")).to(torch.float16)
 
-    with torch.no_grad():
-        preds = modules.util.appstate.global_pipe(input_image)[-1].sigmoid().cpu()
-    pred = preds[0].squeeze()
-    pred_pil = transforms.ToPILImage()(pred)
-    mask = pred_pil.resize(image_size)
-    image.putalpha(mask)
+        with torch.no_grad():
+            preds = modules.util.appstate.global_pipe(input_image)[-1].sigmoid().cpu()
+        pred = preds[0].squeeze()
+        pred_pil = transforms.ToPILImage()(pred)
+        mask = pred_pil.resize(image_size)
+        image.putalpha(mask)
 
-    if save_flat:
-        if bg_colour.startswith('rgba'):
-            bg_colour = rgba_to_hex(bg_colour)
-        if not (bg_colour.startswith('#') and len(bg_colour) == 9):
-            raise ValueError(f"Invalid background color format: {bg_colour}. Expected #RRGGBBAA (e.g., #FFFFFFFF)")
-        try:
-            colour_rgb = tuple(int(bg_colour[i:i+2], 16) for i in (1, 3, 5, 7))
-            background = Image.new("RGBA", image_size, colour_rgb)
-            image = Image.alpha_composite(background, image).convert("RGB")
-        except ValueError as e:
-            raise ValueError(f"Failed to parse background color {bg_colour}: {str(e)}")
+        if save_flat:
+            if bg_colour.startswith('rgba'):
+                bg_colour = rgba_to_hex(bg_colour)
+            if not (bg_colour.startswith('#') and len(bg_colour) == 9):
+                raise ValueError(f"Invalid background color format: {bg_colour}. Expected #RRGGBBAA (e.g., #FFFFFFFF)")
+            try:
+                colour_rgb = tuple(int(bg_colour[i:i+2], 16) for i in (1, 3, 5, 7))
+                background = Image.new("RGBA", image_size, colour_rgb)
+                image = Image.alpha_composite(background, image).convert("RGB")
+            except ValueError as e:
+                raise ValueError(f"Failed to parse background color {bg_colour}: {str(e)}")
 
-    # Save output to output/birefnet with timestamp
-    output_filename = f"{OUTPUT_DIR}{input_filename}.png"
-    image.save(output_filename)
-    
-    return image, output_filename, f"{image_size[0]} x {image_size[1]}"
-    """
+        # Save output to output/birefnet with timestamp
+        output_filename = f"{OUTPUT_DIR}{input_filename}.png"
+        image.save(output_filename)
+        
+        return image, output_filename, f"{image_size[0]} x {image_size[1]}"
+
     except Exception as e:
         raise RuntimeError(f"Error processing image: {str(e)}")
-    """
+    finally:
+        modules.util.appstate.global_inference_in_progress = False
 
 def get_image_info(image):
     """Return image dimensions as a string."""
@@ -182,6 +189,10 @@ def get_video_info(video_path):
         return "Error retrieving dimensions"
 
 def batch_process(input_folder, save_flat, bg_colour, model_name, output_dir_save):
+    if modules.util.appstate.global_inference_in_progress == True:
+        print(">>>>Inference in progress, can't continue<<<<")
+        return None
+    modules.util.appstate.global_inference_in_progress = True
     try:
         os.makedirs(f"{output_dir_save}", exist_ok=True)
         get_pipeline(model_name)
@@ -205,7 +216,7 @@ def batch_process(input_folder, save_flat, bg_colour, model_name, output_dir_sav
             colour_rgb = None
 
         for i, image_path in enumerate(input_images):
-            print(f"BiRefNet [batch]: image {i+1}/{len(input_images)}", end='\r', flush=True)
+            # print(f"BiRefNet [batch]: image {i+1}/{len(input_images)}", end='\r', flush=True)
             try:
                 im = load_img(image_path, output_type="pil").convert("RGB")
                 image_size = im.size
@@ -233,6 +244,8 @@ def batch_process(input_folder, save_flat, bg_colour, model_name, output_dir_sav
         return processed_images
     except Exception as e:
         raise RuntimeError(f"Error in batch processing: {str(e)}")
+    finally:
+        modules.util.appstate.global_inference_in_progress = False
 # modules.util.appstate.global_inference_type
 def get_pipeline(model_name):
     # print("----model: ", model_name)
@@ -309,7 +322,6 @@ def create_birefnet_tab():
             with gr.Column():
                 input_dir = gr.Textbox(label="Input folder path", max_lines=1)
                 output_dir_save = gr.Textbox(label="Output folder path", max_lines=1, value=f"{OUTPUT_DIR}")
-                always_png = gr.Checkbox(label="Always save as PNG", value=True, visible=False)  # Hidden since PNG is forced
                 with gr.Row():
                     batch_save_flat = gr.Checkbox(label="Save flat (no mask)", value=False)
                     batch_bg_colour = gr.ColorPicker(label="Background color for flat images", value="#FFFFFFFF")

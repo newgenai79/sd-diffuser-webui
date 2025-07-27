@@ -32,10 +32,12 @@
     <a href='https://github.com/THUDM/CogVideo'><img src='https://img.shields.io/badge/CogVideoX-blue'></a>
 	<a href='https://huggingface.co/alibaba-pai/CogVideoX-Fun-V1.1-5b-Pose'><img src='https://img.shields.io/badge/CogVideoX_Fun_Pose-red'></a>
 </div-->
-<h2 align='center'>Additional</h2>
+<h2 align='center'>Extra</h2>
 <div align='center'>
     <img src='https://img.shields.io/badge/Video_interpolation+upscaler-blue'></a>
 	<img src='https://img.shields.io/badge/Image_generation_info-red'></a>
+	<a href='https://github.com/ZhengPeng7/BiRefNet'><img src='https://img.shields.io/badge/BiRefNet-blue'></a>
+	<a href='https://huggingface.co/spaces/PramaLLC/BEN2'><img src='https://img.shields.io/badge/Ben2-red'></a>
 </div>
 
 <h2 align='center'>SVDquant - Nunchaku</h2>
